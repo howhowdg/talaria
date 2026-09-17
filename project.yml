@@ -1,0 +1,102 @@
+name: Talaria
+options:
+  bundleIdPrefix: com.talaria.native
+  deploymentTarget:
+    macOS: '14.0'
+    iOS: '17.0'
+packages:
+  HermesNative:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+    CODE_SIGN_STYLE: Automatic
+targets:
+  TalariaMac:
+    type: application
+    productName: Talaria
+    platform: macOS
+    sources:
+      - Apps/macOS
+      - path: Apps/Shared/Talaria.icon
+        type: file
+        buildPhase: resources
+      - path: ThirdPartyNotices.md
+        type: file
+        buildPhase: resources
+      - path: LICENSE
+        type: file
+        buildPhase: resources
+    info:
+      path: Apps/macOS/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    dependencies:
+      - package: HermesNative
+        product: HermesUI
+      - package: HermesNative
+        product: HermesCore
+      - package: HermesNative
+        product: HermesMacServices
+      - package: HermesNative
+        product: HermesTransport
+    settings:
+      base:
+        PRODUCT_NAME: Talaria
+        PRODUCT_BUNDLE_IDENTIFIER: com.talaria.native.mac
+        ASSETCATALOG_COMPILER_APPICON_NAME: Talaria
+        ENABLE_HARDENED_RUNTIME: YES
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        INFOPLIST_KEY_CFBundleDisplayName: Talaria
+  TalariaIOS:
+    type: application
+    productName: Talaria
+    platform: iOS
+    sources:
+      - Apps/iOS
+      - path: Apps/Shared/Talaria.icon
+        type: file
+        buildPhase: resources
+      - path: ThirdPartyNotices.md
+        type: file
+        buildPhase: resources
+      - path: LICENSE
+        type: file
+        buildPhase: resources
+    info:
+      path: Apps/iOS/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    dependencies:
+      - package: HermesNative
+        product: HermesUI
+      - package: HermesNative
+        product: HermesCore
+    settings:
+      base:
+        PRODUCT_NAME: Talaria
+        PRODUCT_BUNDLE_IDENTIFIER: com.talaria.native.ios
+        ASSETCATALOG_COMPILER_APPICON_NAME: Talaria
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Talaria
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        TARGETED_DEVICE_FAMILY: '1,2'
+schemes:
+  TalariaMac:
+    build:
+      targets:
+        TalariaMac: all
+  TalariaIOS:
+    build:
+      targets:
+        TalariaIOS: all

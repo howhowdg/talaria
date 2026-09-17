@@ -1,0 +1,35 @@
+{
+  "fill": {
+    "automatic-gradient": "srgb:0.09412,0.11765,0.09020,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "glass": true,
+          "hidden": false,
+          "image-name": "talaria-wing.png",
+          "name": "Talaria Wing",
+          "position": {
+            "scale": 0.8165869218500797,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.2
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.15
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

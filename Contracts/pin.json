@@ -1,0 +1,6 @@
+{
+  "repository": "https://github.com/NousResearch/hermes-agent",
+  "commit": "a566d20d226a8e2ef0747639dc8a3fc1c43f9dba",
+  "path": "apps/shared/src/gateway-contract.openrpc.json",
+  "sha256": "cdfa614bba98b6eb4f13e0d929396238c89cca2c3b900fd44d9efddcc9da2a48"
+}

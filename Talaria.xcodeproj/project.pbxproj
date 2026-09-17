@@ -1,0 +1,526 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		07DBA47FED183F9847DECCD5 /* HermesUI in Frameworks */ = {isa = PBXBuildFile; productRef = 693050BF42C169D70D4ED267 /* HermesUI */; };
+		0BD71C0201854791AD6A7535 /* HermesUI in Frameworks */ = {isa = PBXBuildFile; productRef = AF30CD238F4EC3097416D2DC /* HermesUI */; };
+		2BC3759BC584A57F3CAC06BA /* HermesTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 82AE1440EDC204049150DD43 /* HermesTransport */; };
+		5CE6AE74ADF66A9B58225B6B /* Talaria.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1E0739185400A0282DCD7576 /* Talaria.icon */; };
+		5F865FC87FE6DF9C3C7012A5 /* HermesMacServices in Frameworks */ = {isa = PBXBuildFile; productRef = 6F36AC66B3D91E3DE802E1FD /* HermesMacServices */; };
+		6E5E126B2390C060B5E3939C /* Talaria.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1E0739185400A0282DCD7576 /* Talaria.icon */; };
+		73680F18CA401757BF5A0E0C /* HermesCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5D116650B05D501239A93E0E /* HermesCore */; };
+		73F15129FB6E5347A1DA8E36 /* ThirdPartyNotices.md in Resources */ = {isa = PBXBuildFile; fileRef = 05B9D2A5E71A6D185130B8D0 /* ThirdPartyNotices.md */; };
+		78430D087B9DAD28A032146F /* HermesCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4264D7FF0699A6D8D4FB1585 /* HermesCore */; };
+		8FB4F3DAB6DF2B71C91BCEEA /* ThirdPartyNotices.md in Resources */ = {isa = PBXBuildFile; fileRef = 05B9D2A5E71A6D185130B8D0 /* ThirdPartyNotices.md */; };
+		988F33A441CAC90C0F7242B5 /* HermesMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 307400E340884C78DE6483AC /* HermesMacApp.swift */; };
+		9DC15CDEFB506FCFAA04E5E9 /* HermesIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BA2D9989CEC03939EADE94E /* HermesIOSApp.swift */; };
+		ABA24BFB83A269A7D1889628 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 73B297A1B4D2D44769416BFB /* LICENSE */; };
+		C28276F949AF7EE039F76088 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 73B297A1B4D2D44769416BFB /* LICENSE */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		05B9D2A5E71A6D185130B8D0 /* ThirdPartyNotices.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ThirdPartyNotices.md; sourceTree = "<group>"; };
+		124129DB4E2DEBC50C16C011 /* Talaria.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Talaria.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A098D0469578B7283AE394E /* Talaria.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Talaria.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1E0739185400A0282DCD7576 /* Talaria.icon */ = {isa = PBXFileReference; path = Talaria.icon; sourceTree = "<group>"; };
+		307400E340884C78DE6483AC /* HermesMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesMacApp.swift; sourceTree = "<group>"; };
+		4130E1F7805E7397B001C0A1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		4BA2D9989CEC03939EADE94E /* HermesIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesIOSApp.swift; sourceTree = "<group>"; };
+		50E6A9F9D04AFD878F789068 /* Hermes Native */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "Hermes Native"; path = .; sourceTree = SOURCE_ROOT; };
+		645C05EB05CC64C3A3FD992C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		73B297A1B4D2D44769416BFB /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7F46A43916054FDF1B1AF082 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0BD71C0201854791AD6A7535 /* HermesUI in Frameworks */,
+				73680F18CA401757BF5A0E0C /* HermesCore in Frameworks */,
+				5F865FC87FE6DF9C3C7012A5 /* HermesMacServices in Frameworks */,
+				2BC3759BC584A57F3CAC06BA /* HermesTransport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F36D6E8BE6190703B6D2AC35 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				07DBA47FED183F9847DECCD5 /* HermesUI in Frameworks */,
+				78430D087B9DAD28A032146F /* HermesCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A37EFAE62F3229349E34F508 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				124129DB4E2DEBC50C16C011 /* Talaria.app */,
+				1A098D0469578B7283AE394E /* Talaria.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B344C975AFFDACB68FBAD152 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				4BA2D9989CEC03939EADE94E /* HermesIOSApp.swift */,
+				4130E1F7805E7397B001C0A1 /* Info.plist */,
+			);
+			name = iOS;
+			path = Apps/iOS;
+			sourceTree = "<group>";
+		};
+		D18736CCB6F6E0082338B937 /* macOS */ = {
+			isa = PBXGroup;
+			children = (
+				307400E340884C78DE6483AC /* HermesMacApp.swift */,
+				645C05EB05CC64C3A3FD992C /* Info.plist */,
+			);
+			name = macOS;
+			path = Apps/macOS;
+			sourceTree = "<group>";
+		};
+		D7564DA576AC5D795BFCA34D /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				50E6A9F9D04AFD878F789068 /* Hermes Native */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		FA2F382BD79E074E6408AA1F = {
+			isa = PBXGroup;
+			children = (
+				73B297A1B4D2D44769416BFB /* LICENSE */,
+				05B9D2A5E71A6D185130B8D0 /* ThirdPartyNotices.md */,
+				B344C975AFFDACB68FBAD152 /* iOS */,
+				D18736CCB6F6E0082338B937 /* macOS */,
+				D7564DA576AC5D795BFCA34D /* Packages */,
+				FB9BD26E1FA77E73A9855CF1 /* Shared */,
+				A37EFAE62F3229349E34F508 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		FB9BD26E1FA77E73A9855CF1 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				1E0739185400A0282DCD7576 /* Talaria.icon */,
+			);
+			name = Shared;
+			path = Apps/Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		19E2CCC8D5A00B0C4146275A /* TalariaIOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E25AC2482722BF31C137DE8D /* Build configuration list for PBXNativeTarget "TalariaIOS" */;
+			buildPhases = (
+				1B398CF6C73CB9F9FDBB6A33 /* Sources */,
+				DEC2FDE427ED140350AC5007 /* Resources */,
+				F36D6E8BE6190703B6D2AC35 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TalariaIOS;
+			packageProductDependencies = (
+				693050BF42C169D70D4ED267 /* HermesUI */,
+				4264D7FF0699A6D8D4FB1585 /* HermesCore */,
+			);
+			productName = TalariaIOS;
+			productReference = 124129DB4E2DEBC50C16C011 /* Talaria.app */;
+			productType = "com.apple.product-type.application";
+		};
+		826DB6548A4EBFE04DCB1170 /* TalariaMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8DC3F5CA2B4E74B077FA5B01 /* Build configuration list for PBXNativeTarget "TalariaMac" */;
+			buildPhases = (
+				27F2C33D644C6D6DF002BAEC /* Sources */,
+				3A9C69F591EDE5F36DAD6EBA /* Resources */,
+				7F46A43916054FDF1B1AF082 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TalariaMac;
+			packageProductDependencies = (
+				AF30CD238F4EC3097416D2DC /* HermesUI */,
+				5D116650B05D501239A93E0E /* HermesCore */,
+				6F36AC66B3D91E3DE802E1FD /* HermesMacServices */,
+				82AE1440EDC204049150DD43 /* HermesTransport */,
+			);
+			productName = TalariaMac;
+			productReference = 1A098D0469578B7283AE394E /* Talaria.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		228D8C57FD8574006AD1BA11 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					19E2CCC8D5A00B0C4146275A = {
+						ProvisioningStyle = Automatic;
+					};
+					826DB6548A4EBFE04DCB1170 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = F244F399B102D7DF7E691D7E /* Build configuration list for PBXProject "Talaria" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = FA2F382BD79E074E6408AA1F;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CA9CF8D796ED4E993F2E57FE /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				19E2CCC8D5A00B0C4146275A /* TalariaIOS */,
+				826DB6548A4EBFE04DCB1170 /* TalariaMac */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3A9C69F591EDE5F36DAD6EBA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C28276F949AF7EE039F76088 /* LICENSE in Resources */,
+				6E5E126B2390C060B5E3939C /* Talaria.icon in Resources */,
+				73F15129FB6E5347A1DA8E36 /* ThirdPartyNotices.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DEC2FDE427ED140350AC5007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ABA24BFB83A269A7D1889628 /* LICENSE in Resources */,
+				5CE6AE74ADF66A9B58225B6B /* Talaria.icon in Resources */,
+				8FB4F3DAB6DF2B71C91BCEEA /* ThirdPartyNotices.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1B398CF6C73CB9F9FDBB6A33 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9DC15CDEFB506FCFAA04E5E9 /* HermesIOSApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		27F2C33D644C6D6DF002BAEC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				988F33A441CAC90C0F7242B5 /* HermesMacApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		077A3FFF626E8BFCA91BF592 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = Talaria;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Apps/iOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Talaria;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.talaria.native.ios;
+				PRODUCT_NAME = Talaria;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		688C3BAAA4F55201BBAE15C6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		7C5286DCB5F6F14866FBF4ED /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = Talaria;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Apps/macOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Talaria;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.talaria.native.mac;
+				PRODUCT_NAME = Talaria;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		D6D48108259C6D68EA3997AD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = Talaria;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Apps/iOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Talaria;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.talaria.native.ios;
+				PRODUCT_NAME = Talaria;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D8FEC1957BEED7BF6888EDD8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = Talaria;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Apps/macOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Talaria;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.talaria.native.mac;
+				PRODUCT_NAME = Talaria;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		E7203F42154C7DA30382C7E8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		8DC3F5CA2B4E74B077FA5B01 /* Build configuration list for PBXNativeTarget "TalariaMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7C5286DCB5F6F14866FBF4ED /* Debug */,
+				D8FEC1957BEED7BF6888EDD8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E25AC2482722BF31C137DE8D /* Build configuration list for PBXNativeTarget "TalariaIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				077A3FFF626E8BFCA91BF592 /* Debug */,
+				D6D48108259C6D68EA3997AD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F244F399B102D7DF7E691D7E /* Build configuration list for PBXProject "Talaria" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E7203F42154C7DA30382C7E8 /* Debug */,
+				688C3BAAA4F55201BBAE15C6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		CA9CF8D796ED4E993F2E57FE /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4264D7FF0699A6D8D4FB1585 /* HermesCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HermesCore;
+		};
+		5D116650B05D501239A93E0E /* HermesCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HermesCore;
+		};
+		693050BF42C169D70D4ED267 /* HermesUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HermesUI;
+		};
+		6F36AC66B3D91E3DE802E1FD /* HermesMacServices */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HermesMacServices;
+		};
+		82AE1440EDC204049150DD43 /* HermesTransport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HermesTransport;
+		};
+		AF30CD238F4EC3097416D2DC /* HermesUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HermesUI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 228D8C57FD8574006AD1BA11 /* Project object */;
+}
