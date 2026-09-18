@@ -1,6 +1,14 @@
 # Talaria — implementation status
 
-17 September 2026. The native conversation build includes settings, attachments, persistent drafts, the published v0.1.1 Mac workspace and the iPhone design handoff implementation. Full Hermes Desktop feature parity remains in progress.
+18 September 2026. The native conversation build includes settings, attachments, persistent drafts, the published v0.1.1 Mac workspace and the iPhone design handoff implementation. Full Hermes Desktop feature parity remains in progress.
+
+## Gateway connection compatibility
+
+The latest local source recognizes Hermes's exact hostname-rejection response and provides SSH forwarding guidance. It does not override Host validation or gated authentication. Initial connection failures no longer suggest restoring a conversation when none exists.
+
+When `client.capabilities` returns JSON-RPC method-not-found, the transport adapts legacy approval/clarify/sudo/secret events and reply methods. Other negotiation failures remain errors. Approval choices stay scoped to their session and request; expiration, bounded replay tracking, concurrent queue refresh and uncertain-response handling prevent silent approval or automatic answer retries. Legacy snapshots that cannot restore a waiting input fail with actionable guidance.
+
+Verification: all 159 Swift tests pass (37 transport, 63 core, 42 UI, 9 protocol, 8 Mac services), and the Mac Debug build succeeds. The actual Mac connection sheet connected to a remote Hermes `7d6db4ef` backend through a separately owned loopback SSH endpoint and loaded the session list. No live agent prompt or permission answer was submitted in this check. The user's existing remote services were preserved. The temporary SSH helper is external to the app and must be restarted after it exits or the Mac restarts; managed SSH connections remain future work. These fixes are not in the published v0.1.1 binary.
 
 ## Working foundation
 

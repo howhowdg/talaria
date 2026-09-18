@@ -51,6 +51,13 @@ public actor GatewayClient {
     private var heartbeatSupported = false
     private var pending: [RPCID: Pending] = [:]
     private var serverRequests: Set<RPCID> = []
+    private enum RequestProtocol { case negotiating, modern, legacy }
+    private var requestProtocol = RequestProtocol.negotiating
+    private var legacyRequests = LegacyGatewayRequests()
+    private var negotiationEvents: [GatewayEvent] = []
+    private var legacyAcknowledged: Set<RPCID> = []
+    private var legacyAnswersInFlight: Set<RPCID> = []
+    private var legacyApprovalReads: [String: UUID] = [:]
     private var subscribers: [UUID: AsyncStream<GatewayUpdate>.Continuation] = [:]
 
     public init() {
@@ -114,7 +121,20 @@ public actor GatewayClient {
             }
             try await waitUntilReady(generation: connectionGeneration)
             try checkGeneration(connectionGeneration)
-            _ = try await request("client.capabilities", params: .object(["server_requests": .bool(true)]), timeout: 10)
+            do {
+                _ = try await request("client.capabilities", params: .object(["server_requests": .bool(true)]), timeout: 10)
+                try checkGeneration(connectionGeneration)
+                requestProtocol = .modern
+            } catch let error as JSONRPCError where error.code == -32601 {
+                // This exact error identifies pre-negotiation Hermes versions.
+                // Adapt their prompt events and reply RPCs; never omit approvals.
+                try checkGeneration(connectionGeneration)
+                requestProtocol = .legacy
+                for event in negotiationEvents {
+                    applyLegacyUpdates(try legacyRequests.receive(event: event), generation: connectionGeneration)
+                }
+            }
+            negotiationEvents.removeAll()
             try checkGeneration(connectionGeneration)
             try Task.checkCancellation()
             isConnected = true
@@ -125,6 +145,7 @@ public actor GatewayClient {
             if error is CancellationError { safeError = CancellationError() }
             else if let transportError = error as? GatewayTransportError { safeError = transportError }
             else if let rpcError = error as? JSONRPCError { safeError = rpcError }
+            else if let legacyError = error as? LegacyGatewayRequestError { safeError = legacyError }
             else { safeError = GatewayTransportError.connectionFailed }
             await failConnection(generation: connectionGeneration, error: safeError)
             throw safeError
@@ -181,8 +202,34 @@ public actor GatewayClient {
 
     private func answer(_ id: RPCID, member: String, value: JSONValue) async throws {
         guard let socket, sawReady else { throw GatewayTransportError.notConnected }
-        guard serverRequests.remove(id) != nil else { throw GatewayTransportError.unknownServerRequest }
+        guard serverRequests.contains(id), !legacyAnswersInFlight.contains(id) else {
+            throw GatewayTransportError.unknownServerRequest
+        }
         let connectionGeneration = generation
+        if requestProtocol == .legacy,
+           let reply = try member == "result" ? legacyRequests.response(to: id, result: value) : legacyRequests.rejection(to: id) {
+            serverRequests.remove(id)
+            legacyAnswersInFlight.insert(id)
+            do {
+                let result = try await request(reply.method, params: reply.params)
+                try checkGeneration(connectionGeneration)
+                try legacyRequests.validateReply(result: result, for: reply)
+                legacyRequests.settle(id)
+                legacyAnswersInFlight.remove(id)
+                legacyAcknowledged.remove(id)
+                if reply.method == "approval.respond" {
+                    try await refreshLegacyApprovals(sessionID: reply.sessionID, generation: connectionGeneration)
+                }
+                return
+            } catch {
+                let safeError = (error as? LegacyGatewayRequestError).map { $0 as Error }
+                    ?? (error as? GatewayTransportError).map { $0 as Error }
+                    ?? GatewayTransportError.connectionFailed
+                await failConnection(generation: connectionGeneration, error: safeError)
+                throw safeError
+            }
+        }
+        serverRequests.remove(id)
         do {
             var frame = OutboundFrame(id: id)
             if member == "result" { frame.result = value } else { frame.error = value }
@@ -222,7 +269,8 @@ public actor GatewayClient {
             }
         } catch {
             guard generation == expected else { return }
-            await failConnection(generation: expected, error: GatewayTransportError.connectionFailed)
+            await failConnection(generation: expected,
+                error: (error as? LegacyGatewayRequestError) ?? GatewayTransportError.connectionFailed as Error)
         }
     }
 
@@ -251,6 +299,22 @@ public actor GatewayClient {
                     serverRequests.remove(id)
                 }
                 publish(.event(event))
+                switch requestProtocol {
+                case .legacy:
+                    if ["message.complete", "session.closed", "session.reclaimed"].contains(event.type),
+                       let sessionID = event.sessionID {
+                        legacyApprovalReads.removeValue(forKey: sessionID)
+                    }
+                    applyLegacyUpdates(try legacyRequests.receive(event: event), generation: expected)
+                case .negotiating:
+                    // Keep prompt/expiration ordering while the capability reply
+                    // is in flight. The handshake has a separate deadline.
+                    if event.type != "gateway.ready" {
+                        guard negotiationEvents.count < 256 else { throw LegacyGatewayRequestError.tooManyPrompts }
+                        negotiationEvents.append(event)
+                    }
+                case .modern: break
+                }
             }
             return
         }
@@ -263,6 +327,15 @@ public actor GatewayClient {
         } else if let result = frame["result"] {
             if let method = pending[id]?.method, ["session.create", "session.resume", "session.activate"].contains(method) {
                 publish(.snapshot(method: method, result: result))
+                if requestProtocol == .legacy {
+                    applyLegacyUpdates(try legacyRequests.replay(snapshot: result), generation: expected)
+                    if let sessionID = result["session_id"]?.stringValue {
+                        Task { [weak self] in
+                            do { try await self?.refreshLegacyApprovals(sessionID: sessionID, generation: expected) }
+                            catch { await self?.failLegacyConnection(generation: expected, error: error) }
+                        }
+                    }
+                }
             }
             // Snapshot questions follow the ordered snapshot marker, before resuming
             // the RPC caller. Re-emit known IDs so partial batch answers refresh.
@@ -281,6 +354,60 @@ public actor GatewayClient {
         let isNew = serverRequests.insert(id).inserted
         guard isNew || replay else { return }
         publish(.request(GatewayServerRequest(id: id, method: method, params: params)))
+    }
+
+    private func applyLegacyUpdates(_ updates: [GatewayUpdate], generation expected: UUID) {
+        for update in updates {
+            switch update {
+            case .request(let request):
+                guard !legacyAnswersInFlight.contains(request.id) else { continue }
+                deliverServerRequest(id: request.id, method: request.method, params: request.params, replay: true)
+                if let receipt = legacyRequests.acknowledgement(for: request.id),
+                   legacyAcknowledged.insert(request.id).inserted {
+                    Task { [weak self] in
+                        guard let self else { return }
+                        do {
+                            try await self.acknowledgeLegacyApproval(receipt, generation: expected)
+                        } catch { await self.failLegacyConnection(generation: expected, error: error) }
+                    }
+                }
+            case .event(let event):
+                if event.type == "request.cancel", let id = parsedID(event.payload["id"]) {
+                    serverRequests.remove(id)
+                    legacyAcknowledged.remove(id)
+                }
+                publish(update)
+            default: break
+            }
+        }
+    }
+
+    private func acknowledgeLegacyApproval(_ receipt: LegacyGatewayReply, generation expected: UUID) async throws {
+        try checkGeneration(expected)
+        _ = try await request(receipt.method, params: receipt.params)
+    }
+
+    private func refreshLegacyApprovals(sessionID: String, generation expected: UUID) async throws {
+        try checkGeneration(expected)
+        let readID = UUID()
+        legacyApprovalReads[sessionID] = readID
+        defer {
+            if generation == expected, legacyApprovalReads[sessionID] == readID {
+                legacyApprovalReads.removeValue(forKey: sessionID)
+            }
+        }
+        let query = LegacyGatewayRequests.approvalsQuery(sessionID: sessionID)
+        let result = try await request(query.method, params: query.params)
+        try checkGeneration(expected)
+        // A completion or a newer read supersedes this snapshot. It must not
+        // resurrect an approval that was not yet known when the turn ended.
+        guard legacyApprovalReads[sessionID] == readID else { return }
+        applyLegacyUpdates(try legacyRequests.replayApprovals(sessionID: sessionID, result: result), generation: expected)
+    }
+
+    private func failLegacyConnection(generation expected: UUID, error: Error) async {
+        await failConnection(generation: expected,
+            error: (error as? LegacyGatewayRequestError) ?? GatewayTransportError.connectionFailed as Error)
     }
 
     private func sendRequest(_ frame: OutboundFrame, id: RPCID, generation expected: UUID) async {
@@ -341,6 +468,12 @@ public actor GatewayClient {
             call.continuation.resume(throwing: error)
         }
         serverRequests.removeAll()
+        requestProtocol = .negotiating
+        legacyRequests = LegacyGatewayRequests()
+        negotiationEvents.removeAll()
+        legacyAcknowledged.removeAll()
+        legacyAnswersInFlight.removeAll()
+        legacyApprovalReads.removeAll()
     }
 
     private func checkGeneration(_ expected: UUID) throws {

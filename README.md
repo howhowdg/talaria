@@ -43,6 +43,10 @@ Choose **Start local Hermes** to launch an existing Hermes installation using it
 
 Alternatively choose **Connect to a gateway** and enter a URL, profile, and gateway session token. Loopback HTTP and remote HTTPS are supported. Remote OAuth / Hermes Cloud login is not implemented yet. Tokens can be saved in the system Keychain; endpoint metadata is kept in the native app's own preferences. Agent/provider credentials stay on the host.
 
+For an SSH tunnel, forward to a Hermes endpoint bound to `127.0.0.1` on the remote host. Forwarding a public-address dashboard can fail its hostname check and still require browser sign-in. Talaria explains that rejection without changing the Host header or bypassing authentication. SSH tunnel startup and restart are not managed by the app yet.
+
+The latest source also supports older gateways that use event-based approval, clarification, sudo and secret requests. Answers retain the original request ID and permission scope and are never retried automatically. Those gateways cannot restore a pending sudo/secret prompt after reconnect; Talaria explains how to resolve it in the original client. Use the backend's launch profile with older versions: their settings inventory may not isolate other profiles correctly.
+
 ## iPhone and iPad
 
 Choose the **TalariaIOS** scheme and an iOS simulator, or configure your development team to run on a device. The deployment target is iOS 17. The iOS app shares the actual client and native views with macOS and connects to a Hermes host; it does not run the Python agent on the phone. Use a reachable HTTPS endpoint on a physical device. The host continues the work when iOS suspends, and the app rehydrates session history on return. Background delivery and push notifications are future work.
