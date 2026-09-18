@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.1 — 2026-09-17
+
+Mac workspace preview.
+
+- Three-column Mac workspace with sidebar or tab navigation, compact typography, blue identity and the vector Talaria mark.
+- Recorded Files, Sources and Terminal inspector with conversation-scoped task status and native Markdown.
+- Native growing message editor with focus, undo, attachment controls and model selection.
+- Corrected session selection, local-date grouping, glass edges and control spacing.
+- Universal Mac download for Apple silicon and Intel. This preview is ad hoc signed and not notarized.
+
 ## 0.1.0 — 2026-09-17
 
 Initial public source preview of Talaria for Mac and iPhone/iPad.

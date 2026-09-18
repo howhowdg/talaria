@@ -11,9 +11,13 @@ The current implementation covers native conversations, model selection, profile
 
 | Mac | iPhone |
 | --- | --- |
-| <img src="research/screenshots/talaria-mac-glass-composer.png" width="640" alt="Talaria Mac conversation composer"> | <img src="research/screenshots/talaria-ios-glass-dark.png" width="235" alt="Talaria iPhone welcome screen in dark appearance"> |
+| <img src="research/screenshots/talaria-mac-compact-workspace-2x.png" width="640" alt="Talaria Mac conversation composer"> | <img src="research/screenshots/talaria-ios-glass-dark.png" width="235" alt="Talaria iPhone welcome screen in dark appearance"> |
 
-Actual development builds. The Mac screenshot uses a synthetic local test gateway and an unsent example draft.
+Actual development builds. The Mac screenshot uses synthetic local test conversations.
+
+## Download the Mac preview
+
+Download the universal Mac app from [GitHub Releases](https://github.com/howhowdg/talaria/releases). It requires macOS 14 or later and an existing Hermes installation or reachable gateway. The preview is ad hoc signed, not Developer ID signed or notarized, so macOS may block opening a downloaded copy. Building from source remains available below.
 
 ## Run the Mac app
 
@@ -46,7 +50,7 @@ Choose the **TalariaIOS** scheme and an iOS simulator, or configure your develop
 ## Implemented
 
 - Native Liquid Glass controls and floating composer on current systems, adaptive light/dark accents, and a shared layered Talaria app icon. Older systems receive native material/button fallbacks. [Identity, assets and generation prompt](Design/Brand/README.md).
-- Native split-view interface, session list/search, create/resume, persistent per-conversation text drafts, keyboard send/stop shortcuts.
+- Three-column Mac workspace with sidebar/tab navigation and recorded Files/Sources/Terminal inspector; native iOS navigation, session search, create/resume, persistent drafts and keyboard send/stop shortcuts.
 - Conversation-scoped model/provider selection, supported reasoning levels, provider catalog refresh and existing-profile switching.
 - Native file picker, bounded file/image uploads, attachment progress/removal and interruption recovery.
 - Token authentication, scoped profile routing, WebSocket JSON-RPC, readiness negotiation, heartbeat, cancellation/timeouts, bounded event delivery, explicit reconnect.

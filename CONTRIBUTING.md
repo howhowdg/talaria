@@ -28,6 +28,16 @@ xcodebuild -project Talaria.xcodeproj -scheme TalariaIOS \
 
 The Mac command creates a local ad hoc development build. It does not create a notarized release. `/tmp` build paths also avoid code-signing problems from metadata added by some synced folders.
 
+## Build the universal Mac preview
+
+```sh
+xcodebuild -project Talaria.xcodeproj -scheme TalariaMac \
+  -configuration Release -derivedDataPath /tmp/talaria-mac-release \
+  'ARCHS=arm64 x86_64' ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- build
+```
+
+Archive `/tmp/talaria-mac-release/Build/Products/Release/Talaria.app` with `ditto -c -k --keepParent` and publish its SHA-256 checksum with the download. This produces the ad hoc signed preview, not a notarized distribution.
+
 ## Change the project
 
 `project.yml` is the source of truth for targets and build settings. If those change, use XcodeGen 2.44.1 or later and run `xcodegen generate`; include the regenerated `Talaria.xcodeproj` with the YAML change. Preserve the explicit `.icon` resource entries, which also work with XcodeGen versions predating automatic Icon Composer support.
