@@ -7,17 +7,17 @@ This is an independent native client prototype. It is not an official Nous Resea
 
 Mac and iOS share one codebase, available under the [MIT license](LICENSE). See [contributor setup](CONTRIBUTING.md), [source release scope](PUBLIC_RELEASE.md), and [security reporting](SECURITY.md).
 
-The current implementation covers native conversations, model selection, profile switching, file/image attachments and persistent text drafts. It is **not yet a full replacement for Hermes Desktop**. The complete roadmap and feature inventory are in [HERMES_NATIVE_PLAN.md](HERMES_NATIVE_PLAN.md).
+The current implementation covers native conversations, model selection, profile switching, file/image attachments and persistent text drafts. The iPhone workspace also shows scheduled-run updates and installed skills from your Hermes host. It is **not yet a full replacement for Hermes Desktop**. The complete roadmap and feature inventory are in [HERMES_NATIVE_PLAN.md](HERMES_NATIVE_PLAN.md).
 
 | Mac | iPhone |
 | --- | --- |
-| <img src="research/screenshots/talaria-mac-compact-workspace-2x.png" width="640" alt="Talaria Mac conversation composer"> | <img src="research/screenshots/talaria-ios-glass-dark.png" width="235" alt="Talaria iPhone welcome screen in dark appearance"> |
+| <img src="research/screenshots/talaria-mac-compact-workspace-2x.png" width="640" alt="Talaria Mac conversation composer"> | <img src="research/screenshots/talaria-ios-handoff-chat.png" width="235" alt="Talaria iPhone chat with floating glass controls"> |
 
-Actual development builds. The Mac screenshot uses synthetic local test conversations.
+Actual native development builds using synthetic local test data. More [iPhone captures and verification details](IMPLEMENTATION_STATUS.md#current-iphone-verification) are available, including Sessions, Updates, approval with the native keyboard, dark appearance and larger text.
 
 ## Download the Mac preview
 
-Download the universal Mac app from [GitHub Releases](https://github.com/howhowdg/talaria/releases). It requires macOS 14 or later and an existing Hermes installation or reachable gateway. The preview is ad hoc signed, not Developer ID signed or notarized, so macOS may block opening a downloaded copy. Building from source remains available below.
+Download the universal Mac app from the [v0.1.1 preview release](https://github.com/howhowdg/talaria/releases/tag/v0.1.1). It requires macOS 14 or later and an existing Hermes installation or reachable gateway. The preview is ad hoc signed, not Developer ID signed or notarized, so macOS may block opening a downloaded copy. Building from source remains available below.
 
 ## Run the Mac app
 
@@ -47,10 +47,15 @@ Alternatively choose **Connect to a gateway** and enter a URL, profile, and gate
 
 Choose the **TalariaIOS** scheme and an iOS simulator, or configure your development team to run on a device. The deployment target is iOS 17. The iOS app shares the actual client and native views with macOS and connects to a Hermes host; it does not run the Python agent on the phone. Use a reachable HTTPS endpoint on a physical device. The host continues the work when iOS suspends, and the app rehydrates session history on return. Background delivery and push notifications are future work.
 
+The compact-width iPhone layout follows the [design handoff](Design/handoff/README.md): floating glass identity controls, a keyboard-aware composer, and Chat, Sessions, Updates, Skills and Files tabs. Chat uses native message bubbles and approval cards; Sessions adds search, date groups and a connection card. Regular-width iPad layouts retain the existing split-view interface. Typography follows Dynamic Type, with light/dark appearances and accessibility fallbacks.
+
+Updates reads the host’s schedules and recent run summaries, and opens the actual conversation for review. Skills lists installed names and categories. Both are read-only and refresh when connecting, returning to the foreground or pulling to refresh. Files shows recorded conversation evidence, not a live host filesystem. Approval choices retain the host’s permission limits. You can draft a message while an approval waits, but sending or queueing a new prompt during a running turn, live steering, voice, schedule editing and skill management are not implemented.
+
 ## Implemented
 
 - Native Liquid Glass controls and floating composer on current systems, adaptive light/dark accents, and a shared layered Talaria app icon. Older systems receive native material/button fallbacks. [Identity, assets and generation prompt](Design/Brand/README.md).
-- Three-column Mac workspace with sidebar/tab navigation and recorded Files/Sources/Terminal inspector; native iOS navigation, session search, create/resume, persistent drafts and keyboard send/stop shortcuts.
+- Three-column Mac workspace with sidebar/tab navigation and recorded Files/Sources/Terminal inspector; floating iPhone workspace with Chat/Sessions/Updates/Skills/Files, session search, create/resume and persistent drafts.
+- Read-only iPhone activity from real scheduled-run history and installed skills, with connection/profile scoping, seen-run badges and visible partial-load errors.
 - Conversation-scoped model/provider selection, supported reasoning levels, provider catalog refresh and existing-profile switching.
 - Native file picker, bounded file/image uploads, attachment progress/removal and interruption recovery.
 - Token authentication, scoped profile routing, WebSocket JSON-RPC, readiness negotiation, heartbeat, cancellation/timeouts, bounded event delivery, explicit reconnect.
@@ -59,7 +64,7 @@ Choose the **TalariaIOS** scheme and an iOS simulator, or configure your develop
 - Keychain token storage and a Mac-only local runtime supervisor with readiness parsing and bounded shutdown.
 - Pinned upstream OpenRPC contract with a generated exhaustive method/event catalog and focused Codable models.
 
-Native Markdown supports inline formatting, headings, lists, quotes and fenced code while streaming. Tables, rich media, syntax highlighting, provider provisioning/accounts, broad preferences, projects/git, terminal panes, browser control, plugins, skills/MCP screens, cron, voice and the other desktop subsystems remain on the roadmap. Session listing currently loads the latest 100 sessions. Existing profiles can be selected from the host; creating, editing and deleting profiles is not implemented.
+Native Markdown supports inline formatting, headings, lists, quotes and fenced code while streaming. Tables, rich media, syntax highlighting, provider provisioning/accounts, broad preferences, projects/git, interactive terminals, browser control, plugins, skill/MCP management, schedule editing, voice and the other desktop subsystems remain on the roadmap. Session listing currently loads the latest 100 sessions. Existing profiles can be selected from the host; creating, editing and deleting profiles is not implemented.
 
 New sessions use `source: "native"` until the client implements the desktop UI bridges. Unsupported UI server requests receive a method-not-supported error. Merely generating all RPC names does not implement their features.
 
@@ -80,9 +85,13 @@ python3 scripts/generate-contracts.py --check
 swift test --scratch-path /tmp/talaria-swift-build
 ```
 
+The current handoff pass has 142 passing Swift tests, passing Mac/iOS simulator Debug builds and no pinned-contract drift. See [implementation status](IMPLEMENTATION_STATUS.md#current-iphone-verification) for the real-gateway checks and the limits of simulator visual verification.
+
 `scripts/smoke-real-gateway.py` launches the pinned upstream Python server in a disposable home with a synthetic loopback OpenAI-compatible provider. It uses no real provider keys, runs a harmless todo tool cycle, and checks native-client reconnect and history. It requires the Hermes Python dependencies to already be installed; run `python3 scripts/smoke-real-gateway.py --help` for paths/options. Use `--native-runtime` to additionally verify that the Swift runtime manager starts and stops the real backend. Add `--extended` to verify session-only model changes, profile isolation and actual document/image delivery to the synthetic provider. The fixture blocks outbound Python networking and whitelists the subprocess environment. It is a test harness, not a replacement agent backend.
 
 The standalone `hermes-smoke` executable can also exercise a configured gateway. It creates a session and sends a real prompt; set `HERMES_GATEWAY_TOKEN` in the environment rather than placing tokens in command arguments.
+
+For repeatable phone design previews, the [synthetic iPhone fixture instructions](IMPLEMENTATION_STATUS.md#repeat-the-iphone-design-preview) use `scripts/fixtures/mobile_design_gateway.py` and `scripts/preview_ios_design.py`. This Debug-only path supplies sample data without real provider calls; it is separate from real Hermes integration testing.
 
 ## Layout
 

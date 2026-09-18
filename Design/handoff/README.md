@@ -15,6 +15,14 @@ Everything in this bundle is a **design reference built in HTML** — it shows i
 ## Fidelity
 **High-fidelity** for layout, colour, type, radii and hierarchy. Icons in the mocks are Unicode placeholders — use SF Symbols (suggested names below). Data is sample data.
 
+## iPhone implementation notes
+
+The compact-width SwiftUI workspace implements the floating chrome, chat bubbles, Sessions, Updates, approval cards, installed Skills and recorded Files. Regular-width iPad keeps the existing split layout. Phone typography follows Dynamic Type; the latest compact Mac text scale does not apply to iPhone.
+
+The reference below describes the intended design. Implemented controls use real host data and supported actions: Updates reads scheduled-run history, Skills lists installed skills, and Files shows recorded evidence. Approval buttons retain the host’s allowed permission scopes rather than inventing folder-specific grants. Drafting while approval is pending works; sending or queueing another prompt during a running turn, live steering, voice, schedule editing and background notifications remain unimplemented. The mock’s sample statuses, elapsed times and content are not substituted for unavailable data.
+
+See the [native iPhone captures and verification limits](../../IMPLEMENTATION_STATUS.md#current-iphone-verification), plus the [repeatable Debug fixture](../../IMPLEMENTATION_STATUS.md#repeat-the-iphone-design-preview), for the implemented screens. Images under this handoff’s `screens/` directory remain the original design references.
+
 ## Where each screen lives
 | Screen | File / anchor |
 | --- | --- |

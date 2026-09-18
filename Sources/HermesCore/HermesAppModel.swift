@@ -26,6 +26,14 @@ public final class HermesAppModel {
     public private(set) var attachmentDrafts: [ComposerScope: [AttachmentItem]] = [:]
     public private(set) var submittingScopes = Set<ComposerScope>()
     public private(set) var savedEndpoint: GatewayEndpoint?
+    public private(set) var mobileActivity = MobileActivitySnapshot()
+    public private(set) var isLoadingMobileActivity = false
+    public private(set) var mobileActivityError: String?
+    public private(set) var mobilePendingInputs: [MobilePendingInput] = []
+    private var seenMobileRunIDs = Set<String>()
+    @ObservationIgnored private let mobileActivityLoader: MobileActivityLoader?
+    @ObservationIgnored private var mobileActivityTask: Task<MobileActivitySnapshot, Error>?
+    @ObservationIgnored private var mobileActivityRevision = 0
     @ObservationIgnored private var client: GatewayClient
     @ObservationIgnored private let clientFactory: @MainActor () -> GatewayClient
     @ObservationIgnored private let defaults: UserDefaults
@@ -56,15 +64,68 @@ public final class HermesAppModel {
 
     public init(defaults: UserDefaults = .standard, draftStore: DraftStore? = nil,
                 sender: AttachmentSender = AttachmentSender(),
+                mobileActivityLoader: MobileActivityLoader? = nil,
                 clientFactory: @escaping @MainActor () -> GatewayClient = { GatewayClient() }) {
         self.defaults = defaults; self.draftStore = draftStore ?? DraftStore(); self.sender = sender
         self.clientFactory = clientFactory; client = clientFactory()
+        self.mobileActivityLoader = mobileActivityLoader
         if let data = defaults.data(forKey: "gateway.endpoint") {
             savedEndpoint = try? JSONDecoder().decode(GatewayEndpoint.self, from: data)
         }
     }
 
     public var conversation: ConversationState? { selectedID.flatMap { conversations[$0] } }
+    public var unreadMobileRunCount: Int {
+        mobileActivity.runs.filter { !$0.isActive && !seenMobileRunIDs.contains($0.id) }.count
+    }
+
+    public func refreshMobileActivity() async {
+        guard isConnected, !isLoadingMobileActivity, let endpoint, let token else { return }
+        let stamp = generation
+        mobileActivityRevision += 1; let revision = mobileActivityRevision
+        let client = client; let loader = mobileActivityLoader
+        isLoadingMobileActivity = true; mobileActivityError = nil
+        let task = Task {
+            if let loader { return try await loader(client, endpoint, token) }
+            return try await MobileActivityService(client: client,
+                reader: GatewayReader(endpoint: endpoint, token: token)).load(profile: endpoint.profile)
+        }
+        mobileActivityTask = task
+        defer {
+            if generation == stamp, mobileActivityRevision == revision {
+                isLoadingMobileActivity = false; mobileActivityTask = nil
+            }
+        }
+        do {
+            let snapshot = try await task.value
+            guard generation == stamp, mobileActivityRevision == revision, isConnected else { return }
+            mobileActivity = snapshot
+        } catch {
+            guard generation == stamp, mobileActivityRevision == revision, !(error is CancellationError) else { return }
+            mobileActivityError = safeDescription(error)
+        }
+    }
+
+    public func markMobileRunsSeen() {
+        guard isConnected, let endpoint else { return }
+        let current = mobileActivity.runs.filter { !$0.isActive }.map(\.id)
+        let retained = current + seenMobileRunIDs.sorted().filter { !current.contains($0) }
+        seenMobileRunIDs = Set(retained.prefix(2_000))
+        defaults.set(seenMobileRunIDs.sorted(), forKey: mobileSeenKey(endpoint))
+    }
+
+    private func mobileSeenKey(_ endpoint: GatewayEndpoint) -> String {
+        let parts = [endpoint.id.uuidString, endpoint.baseURL.absoluteString, endpoint.profile]
+        let data = (try? JSONEncoder().encode(parts)) ?? Data()
+        return "mobile.activity.seen." + data.base64EncodedString()
+    }
+
+    private func resetMobileActivity(for endpoint: GatewayEndpoint? = nil) {
+        mobileActivityTask?.cancel(); mobileActivityTask = nil; mobileActivityRevision += 1
+        mobileActivity = MobileActivitySnapshot(); mobileActivityError = nil
+        isLoadingMobileActivity = false; mobilePendingInputs = []
+        seenMobileRunIDs = endpoint.map { Set((defaults.stringArray(forKey: mobileSeenKey($0)) ?? []).prefix(2_000)) } ?? []
+    }
     public var composerScope: ComposerScope? {
         guard let endpoint, let selectedID else { return nil }
         return ComposerScope(connectionID: endpoint.id, profile: endpoint.profile, storedSessionID: selectedID)
@@ -102,6 +163,7 @@ public final class HermesAppModel {
         let previous = sameConnection ? selectedID : draftStore.selectedSession(for: owner)
         let previousToken = sameHost ? token : nil
         let stamp = UUID(); generation = stamp
+        resetMobileActivity(for: endpoint)
         releaseSnapshotWaiters()
         appliedSnapshots = [:]
         receiver?.cancel(); refreshTask?.cancel()
@@ -162,6 +224,7 @@ public final class HermesAppModel {
 
     public func disconnect() async {
         generation = UUID(); receiver?.cancel(); refreshTask?.cancel()
+        resetMobileActivity()
         releaseSnapshotWaiters()
         cancelAttachmentTransfers()
         do { try draftStore.flush() } catch { banner = draftStore.lastError }
@@ -303,6 +366,7 @@ public final class HermesAppModel {
             guard generation == stamp else { return false }
             pendingRequests.removeValue(forKey: input.id)
             for id in conversations.keys { conversations[id]?.removeRequest(input.id) }
+            updateMobilePendingInputs()
             return true
         } catch {
             if generation == stamp { banner = safeDescription(error) }
@@ -540,6 +604,7 @@ public final class HermesAppModel {
         case .connected: isConnected = true
         case .disconnected(let reason):
             isConnected = false
+            resetMobileActivity()
             releaseSnapshotWaiters()
             cancelAttachmentTransfers()
             pendingRequests = [:]
@@ -594,6 +659,7 @@ public final class HermesAppModel {
                     guard generation == stamp else { return }
                 }
             }
+            updateMobilePendingInputs()
             for state in conversations.values {
                 invalidateAttachments(for: state)
                 if event.type == "message.complete", event.sessionID == state.runtimeID.rawValue || event.sessionID == state.storedID.rawValue {
@@ -643,6 +709,20 @@ public final class HermesAppModel {
                 }
             }
         }
+        updateMobilePendingInputs()
+    }
+
+    private func updateMobilePendingInputs() {
+        guard let endpoint, isConnected else { mobilePendingInputs = []; return }
+        let owner = SessionOwner(connectionID: endpoint.id, profile: endpoint.profile)
+        mobilePendingInputs = pendingRequests.values.map { request in
+            let ids = [request.params["session_id"]?.stringValue,
+                       request.params["gateway_session_id"]?.stringValue].compactMap { $0 }
+            let state = conversations.values.first {
+                $0.owner == owner && (ids.contains($0.runtimeID.rawValue) || ids.contains($0.storedID.rawValue))
+            }
+            return MobilePendingInput(input: PendingInput(request), state: state)
+        }.sorted { $0.id < $1.id }
     }
 
     private func safeDescription(_ error: Error) -> String {

@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-import HermesCore
+@testable import HermesCore
 import HermesProtocol
 @testable import HermesTransport
 
@@ -47,6 +47,11 @@ private actor AppModelSocket: GatewaySocket {
     func releaseInventory() throws {
         if let heldInventory { try push(heldInventory); self.heldInventory = nil }
     }
+    func injectApproval(sessionID: String) throws {
+        try push(.object(["jsonrpc": .string("2.0"), "id": .string("approval-fixture"), "method": .string("approval"),
+            "params": .object(["session_id": .string(sessionID), "request_id": .string("approval-fixture"),
+                               "description": .string("Review this command"), "command": .string("echo fixture")])]))
+    }
     func receive() async throws -> String {
         if !frames.isEmpty { return frames.removeFirst() }
         if closed { throw URLError(.cancelled) }
@@ -75,11 +80,12 @@ private final class AppModelClientFactory {
 
 @MainActor
 final class HermesAppModelTests: XCTestCase {
-    private func fixture() throws -> (HermesAppModel, AppModelClientFactory, URL, UserDefaults) {
+    private func fixture(loader: MobileActivityLoader? = nil) throws -> (HermesAppModel, AppModelClientFactory, URL, UserDefaults) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("talaria-model-tests-\(UUID().uuidString)")
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "talaria-model-tests-\(UUID().uuidString)"))
         let factory = AppModelClientFactory()
-        let model = HermesAppModel(defaults: defaults, draftStore: DraftStore(directory: directory), clientFactory: { factory.make() })
+        let model = HermesAppModel(defaults: defaults, draftStore: DraftStore(directory: directory),
+            mobileActivityLoader: loader, clientFactory: { factory.make() })
         return (model, factory, directory, defaults)
     }
     private func endpoint(id: UUID = UUID(), profile: String = "default") -> GatewayEndpoint {
@@ -169,4 +175,85 @@ final class HermesAppModelTests: XCTestCase {
         XCTAssertEqual(model.draft, "First connection")
         await model.disconnect()
     }
+
+    func testLateActivityCannotRestoreOldProfileOrLoadingState() async throws {
+        let activity = HeldActivityLoader()
+        let (model, _, directory, _) = try fixture(loader: { _, endpoint, _ in try await activity.load(endpoint.profile) })
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let connection = endpoint()
+        await model.connect(to: connection, token: "fixture-token")
+        let oldLoad = Task { await model.refreshMobileActivity() }
+        for _ in 0..<100 {
+            if await activity.isHolding() { break }
+            try? await Task.sleep(for: .milliseconds(2))
+        }
+        var secondary = connection; secondary.profile = "research"
+        await model.connect(to: secondary, token: nil)
+        await model.refreshMobileActivity()
+        XCTAssertEqual(model.mobileActivity.runs.first?.title, "research")
+        await activity.release()
+        await oldLoad.value
+        XCTAssertEqual(model.mobileActivity.runs.first?.title, "research")
+        XCTAssertFalse(model.isLoadingMobileActivity)
+        XCTAssertNil(model.mobileActivityError)
+        await model.disconnect()
+        XCTAssertTrue(model.mobileActivity.runs.isEmpty)
+    }
+
+    func testSeenRunsPersistPerConnectionAndProfile() async throws {
+        let (model, _, directory, _) = try fixture(loader: { _, endpoint, _ in activitySnapshot(endpoint.profile) })
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let connection = endpoint()
+        await model.connect(to: connection, token: "fixture-token")
+        await model.refreshMobileActivity()
+        XCTAssertEqual(model.unreadMobileRunCount, 1)
+        model.markMobileRunsSeen()
+        XCTAssertEqual(model.unreadMobileRunCount, 0)
+        var other = connection; other.profile = "research"
+        await model.connect(to: other, token: nil)
+        await model.refreshMobileActivity()
+        XCTAssertEqual(model.unreadMobileRunCount, 1, "Same run ID in another profile is independently unread")
+        await model.connect(to: connection, token: nil)
+        await model.refreshMobileActivity()
+        XCTAssertEqual(model.unreadMobileRunCount, 0)
+        await model.connect(to: endpoint(), token: "another-token")
+        await model.refreshMobileActivity()
+        XCTAssertEqual(model.unreadMobileRunCount, 1, "Connection IDs also fence seen state")
+        await model.disconnect()
+    }
+
+    func testGlobalPendingInputDoesNotGuessStoredIDAndClearsAfterAnswer() async throws {
+        let (model, factory, directory, _) = try fixture()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        await model.connect(to: endpoint(), token: "fixture-token")
+        let socket = try XCTUnwrap(factory.sockets.last)
+        try await socket.injectApproval(sessionID: "runtime-default")
+        await settle { model.mobilePendingInputs.count == 1 }
+        XCTAssertNil(model.mobilePendingInputs.first?.sessionID)
+        await model.newConversation()
+        await settle { model.mobilePendingInputs.first?.sessionID?.rawValue == "stored-default" }
+        let input = try XCTUnwrap(model.mobilePendingInputs.first?.input)
+        let answered = await model.answer(input, result: .object(["choice": .string("deny")]))
+        XCTAssertTrue(answered)
+        XCTAssertTrue(model.mobilePendingInputs.isEmpty)
+        await model.disconnect()
+    }
+}
+
+private func activitySnapshot(_ profile: String) -> MobileActivitySnapshot {
+    let schedule = MobileSchedule(json: .object(["id": .string("job"), "name": .string(profile)]))!
+    let run = MobileRun(json: .object(["id": .string("same-run"), "title": .string(profile),
+        "started_at": .number(1_800_000_000)]), schedule: schedule, profile: profile)!
+    return MobileActivitySnapshot(schedules: [schedule], runs: [run])
+}
+
+private actor HeldActivityLoader {
+    private var continuation: CheckedContinuation<MobileActivitySnapshot, Never>?
+    func load(_ profile: String) async throws -> MobileActivitySnapshot {
+        if profile != "default" { return activitySnapshot(profile) }
+        // Deliberately ignores cancellation to model a late transport completion.
+        return await withCheckedContinuation { continuation = $0 }
+    }
+    func isHolding() -> Bool { continuation != nil }
+    func release() { continuation?.resume(returning: activitySnapshot("default")); continuation = nil }
 }

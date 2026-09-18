@@ -35,7 +35,11 @@ public struct HermesRootView: View {
             .talariaWindowBackground()
             .preferredColorScheme(.light)
             #else
-            mobileNavigation
+            if horizontalSizeClass == .compact {
+                IOSWorkspaceView(model: model)
+            } else {
+                mobileNavigation
+            }
             #endif
         }
         .tint(TalariaStyle.accent)
@@ -52,9 +56,12 @@ public struct HermesRootView: View {
         }
         #if os(iOS)
         .onChange(of: selection) { _, id in
-            if let id, id != model.selectedID { Task { await model.openSession(id) } }
+            if horizontalSizeClass != .compact, let id, id != model.selectedID {
+                Task { await model.openSession(id) }
+            }
         }
         .onChange(of: model.selectedID) { _, id in
+            guard horizontalSizeClass != .compact else { return }
             selection = id
             if id != nil { preferredColumn = .detail }
         }

@@ -46,7 +46,17 @@ public struct ToolActivityCard: View {
 private struct ToolActivityRow: View {
     let message: ChatMessage
     @State private var expanded = false
+    #if os(iOS)
+    @ScaledMetric private var rowSize: CGFloat = 14
+    #endif
     private var name: String { message.toolName?.nonempty ?? "Tool" }
+    private var rowFont: Font {
+        #if os(iOS)
+        .system(size: rowSize)
+        #else
+        ActivityAppearance.row
+        #endif
+    }
 
     var body: some View {
         let phase = ToolPhase(message)
@@ -56,14 +66,14 @@ private struct ToolActivityRow: View {
             Button { expanded.toggle() } label: {
                 HStack(spacing: 10) {
                     ToolPhaseSymbol(phase: phase).frame(width: 12)
-                    Text(name).font(ActivityAppearance.rowSemibold).foregroundStyle(ActivityAppearance.ink).lineLimit(1)
+                    Text(name).font(rowFont.weight(.semibold)).foregroundStyle(ActivityAppearance.ink).lineLimit(1)
                     if let argument {
-                        Text(argument.text).font(argument.isCode ? ActivityAppearance.mono : ActivityAppearance.row)
+                        Text(argument.text).font(argument.isCode ? ActivityAppearance.mono : rowFont)
                             .foregroundStyle(ActivityAppearance.secondary).lineLimit(1).truncationMode(.middle)
                     }
                     Spacer(minLength: 0)
                     if !trailing.isEmpty {
-                        Text(trailing).font(ActivityAppearance.row).foregroundStyle(ActivityAppearance.tertiary).lineLimit(1)
+                        Text(trailing).font(rowFont).foregroundStyle(ActivityAppearance.tertiary).lineLimit(1)
                     }
                 }
                 .padding(.horizontal, 12).padding(.vertical, 9)
@@ -196,7 +206,7 @@ private enum ActivityAppearance {
         #if os(macOS)
         T.card
         #else
-        TalariaStyle.cardSurface.opacity(0.55)
+        Color(uiColor: .secondarySystemGroupedBackground).opacity(0.85)
         #endif
     }
     static var cardBorder: Color {

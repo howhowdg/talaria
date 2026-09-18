@@ -16,6 +16,9 @@ public struct InputRequestView: View {
     @State private var selections: [String: Set<String>] = [:]
     @State private var submitting = false
     @State private var submissionID: UUID?
+    #if os(iOS)
+    @ScaledMetric private var approvalButtonWidth: CGFloat = 130
+    #endif
 
     public init(input: PendingInput, onAnswer: @escaping @MainActor (JSONValue) async -> Bool) {
         self.input = input
@@ -23,6 +26,23 @@ public struct InputRequestView: View {
     }
 
     public var body: some View {
+        Group {
+            #if os(iOS)
+            if input.method == "approval" {
+                mobileApprovalCard
+            } else {
+                requestCard
+            }
+            #else
+            requestCard
+            #endif
+        }
+        .disabled(submitting)
+        .onChange(of: input.id) { _, _ in reset() }
+        .onDisappear { clearValues() }
+    }
+
+    private var requestCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             Label {
                 Text(title).foregroundStyle(.primary)
@@ -52,10 +72,107 @@ public struct InputRequestView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.background, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(.quaternary, lineWidth: 1))
-        .disabled(submitting)
-        .onChange(of: input.id) { _, _ in reset() }
-        .onDisappear { clearValues() }
     }
+
+    #if os(iOS)
+    private var mobileApprovalCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "lock.shield")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(TalariaStyle.accent)
+                    .frame(width: 34, height: 34)
+                    .background(TalariaStyle.accentTint, in: RoundedRectangle(cornerRadius: 11))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(nonempty("description") ?? "Permission requested")
+                        .iosFont(15, .semibold)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                    if let tool = nonempty("tool_name") {
+                        Text(tool).iosFont(13).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let requestedCommand = nonempty("command") {
+                ScrollView(.horizontal) {
+                    Text(requestedCommand)
+                        .iosFont(13).monospaced().lineSpacing(5)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(12)
+                .background(Color(uiColor: .label).opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityLabel("Requested command: \(requestedCommand)")
+            }
+            if input.params["smart_denied"]?.boolValue == true {
+                Text("Hermes flagged this command for review. Permission is limited to this attempt.")
+                    .iosFont(13).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            mobileApprovalActions
+            if submitting {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Sending response…").iosFont(12).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .talariaGlass(cornerRadius: 22)
+        .shadow(color: Color(red: 10 / 255, green: 25 / 255, blue: 50 / 255).opacity(0.12), radius: 12, y: 8)
+    }
+
+    private var mobileApprovalActions: some View {
+        VStack(spacing: 4) {
+            let mainChoices = approvalChoices.filter { $0 != "session" }
+            if !mainChoices.isEmpty {
+                // Keep the two primary choices alongside each other when their
+                // natural Dynamic Type widths fit; otherwise give each a row.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(mainChoices, id: \.self) { choice in
+                            mobileApprovalButton(choice).frame(minWidth: approvalButtonWidth)
+                        }
+                    }
+                    VStack(spacing: 8) {
+                        ForEach(mainChoices, id: \.self) { choice in mobileApprovalButton(choice) }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            if approvalChoices.contains("session") {
+                mobileApprovalButton("session")
+            }
+            Button(role: .cancel) { answer(.object(["choice": .string("deny")])) } label: {
+                Text("Deny").iosFont(14).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder private func mobileApprovalButton(_ choice: String) -> some View {
+        let button = Button { answer(.object(["choice": .string(choice)])) } label: {
+            Text(approvalLabel(choice)).iosFont(14, .semibold)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+        }
+        if choice == "once" {
+            button.talariaProminentButton().frame(maxWidth: .infinity, minHeight: 44)
+        } else {
+            button.talariaSecondaryButton().frame(maxWidth: .infinity, minHeight: 44)
+        }
+    }
+    #endif
 
     private var title: String {
         switch input.method {
