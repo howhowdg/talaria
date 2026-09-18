@@ -51,7 +51,7 @@ public struct SessionSettingsView: View {
                 if let snapshot = state.snapshot {
                     modelSection(snapshot)
                     profileSection(snapshot)
-                    ForEach(snapshot.notices, id: \.self) { Text($0).font(.footnote).foregroundStyle(.secondary) }
+                    ForEach(snapshot.notices, id: \.self) { Text($0).font(TalariaTypography.footnote).foregroundStyle(.secondary) }
                 } else if !state.isLoading {
                     ContentUnavailableView("Settings unavailable", systemImage: "slider.horizontal.3",
                                            description: Text("Refresh to read settings from the connected Hermes host."))
@@ -93,13 +93,13 @@ public struct SessionSettingsView: View {
     @ViewBuilder private func modelSection(_ snapshot: GatewaySettingsSnapshot) -> some View {
         Section {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Current model").font(.subheadline).foregroundStyle(.secondary)
+                Text("Current model").font(TalariaTypography.subheadline).foregroundStyle(.secondary)
                 Text(snapshot.models.model.isEmpty ? "Not selected" : snapshot.models.model)
-                    .font(.body).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                    .font(TalariaTypography.body).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             }
             if state.sessionID == nil {
                 Text("Open a conversation to choose its model. These controls apply to that conversation.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(TalariaTypography.footnote).foregroundStyle(.secondary)
             }
             if snapshot.models.providers.isEmpty {
                 Text("No configured providers are available. Configure a provider on the Hermes host, then refresh.")
@@ -120,10 +120,10 @@ public struct SessionSettingsView: View {
                 }
                 if let selectedProvider {
                     if let warning = selectedProvider.warning, !warning.isEmpty {
-                        Text(warning).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
+                        Text(warning).font(TalariaTypography.footnote).foregroundStyle(.secondary).textSelection(.enabled)
                     }
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Model ID").font(.subheadline).foregroundStyle(.secondary)
+                        Text("Model ID").font(TalariaTypography.subheadline).foregroundStyle(.secondary)
                         TextField("Model ID", text: $model)
                             .labelsHidden()
                             .autocorrectionDisabled()
@@ -143,7 +143,7 @@ public struct SessionSettingsView: View {
                         .disabled(selectedProvider.models.isEmpty)
                     }
                     Text("Choose a listed model or enter a custom model ID for this provider.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(TalariaTypography.footnote).foregroundStyle(.secondary)
                     if let capabilities = selectedProvider.capabilities[model], capabilities.reasoning {
                         Picker("Reasoning", selection: $reasoning) {
                             Text("Model default").tag("")
@@ -165,7 +165,7 @@ public struct SessionSettingsView: View {
                 if snapshot.models.currentCapabilities?.fast == true {
                     LabeledContent("Fast mode", value: snapshot.fastMode == "fast" ? "On" : (snapshot.fastMode == nil ? "Unknown" : "Off"))
                     Text("Fast mode is read-only for existing conversations until the host supports a safe session-only change.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(TalariaTypography.footnote).foregroundStyle(.secondary)
                 }
             }
         } header: { Text("Model") }
@@ -187,7 +187,7 @@ public struct SessionSettingsView: View {
                     }
                 }
                 if let selected = snapshot.profiles.first(where: { $0.name == profile }), !selected.description.isEmpty {
-                    Text(selected.description).font(.footnote).foregroundStyle(.secondary)
+                    Text(selected.description).font(TalariaTypography.footnote).foregroundStyle(.secondary)
                 }
                 Button("Use profile") {
                     Task {

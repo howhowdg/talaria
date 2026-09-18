@@ -30,7 +30,7 @@ public struct InputRequestView: View {
                 Image(systemName: input.method == "clarify" ? "questionmark.bubble" : "lock.shield")
                     .foregroundStyle(TalariaStyle.accent)
             }
-            .font(.headline)
+            .font(TalariaTypography.headline)
             switch input.method {
             case "approval": approvalBody
             case "clarify": clarificationBody
@@ -44,7 +44,7 @@ public struct InputRequestView: View {
             if submitting {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text("Sending response…").font(.caption).foregroundStyle(.secondary)
+                    Text("Sending response…").font(TalariaTypography.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -91,7 +91,7 @@ public struct InputRequestView: View {
             command
             if input.params["smart_denied"]?.boolValue == true {
                 Text("Hermes flagged this command for review. Permission is limited to this attempt.")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(TalariaTypography.callout).foregroundStyle(.secondary)
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) { approvalButtons }.fixedSize(horizontal: true, vertical: false)
@@ -121,7 +121,7 @@ public struct InputRequestView: View {
     @ViewBuilder private var command: some View {
         if let command = nonempty("command") {
             ScrollView(.horizontal) {
-                Text(command).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                Text(command).font(TalariaTypography.callout.monospaced()).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(10)
@@ -161,16 +161,16 @@ public struct InputRequestView: View {
         VStack(alignment: .leading, spacing: 18) {
             ForEach(questions) { question in
                 VStack(alignment: .leading, spacing: 9) {
-                    Text(question.text).font(.body.weight(.medium)).textSelection(.enabled)
+                    Text(question.text).font(TalariaTypography.body.weight(.medium)).textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                     if let locked = lockedAnswers[question.id] {
                         Label(locked.isEmpty ? "Skipped" : locked, systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.secondary)
-                        Text("Already received by Hermes").font(.caption).foregroundStyle(.secondary)
+                        Text("Already received by Hermes").font(TalariaTypography.caption).foregroundStyle(.secondary)
                     } else {
                         if question.multiple && !question.choices.isEmpty {
                             Text("Choose any that apply, or write your own answer.")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(TalariaTypography.caption).foregroundStyle(.secondary)
                         }
                         ForEach(Array(question.choices.enumerated()), id: \.offset) { _, choice in
                             Button { select(choice, for: question) } label: {

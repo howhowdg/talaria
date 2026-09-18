@@ -1,5 +1,23 @@
 # Talaria identity and native materials
 
+## Current in-app identity — handoff v2
+
+The [v2 handoff](../handoff/README.md), refined by the [native Mac correction spec](../handoff/SWIFTUI_SPEC_MAC.md), is the source of truth for the redesign. `TalariaMark.imageset` contains the supplied `talaria-mark.svg` unchanged, preserves its vector representation, and renders it as an accent-tinted template. The native wordmark uses New York semibold with the handoff’s optical spacing. The blue palette replaces the original green in the application interface.
+
+| Use | Color |
+| --- | --- |
+| Prominent buttons and running indicators | `#3B7DDD` |
+| Light appearance links, mark and small labels | `#1F5FB8` |
+| Dark appearance links, mark and small labels | `#7FB0F0` |
+
+The Mac workspace uses the exact light palette and point sizes in `TalariaTheme.swift`, with custom glass modifiers behind the existing `TalariaStyle` interface. The iOS catalog retains adaptive colors, high-contrast variants and Dynamic Type under `TalariaMobileAccent`. Activity pulses respect Reduce Motion. The Mac workspace follows screen 4a; the iPhone floating-chrome redesign is a subsequent step.
+
+The Icon Composer app icon still uses the earlier wing artwork described below; replacing the launcher icon is separate from this in-app mark/layout pass.
+
+## Earlier identity and existing launcher icon
+
+The following records the original artwork, not the current interface palette.
+
 Talaria uses a swept wing, suggesting the winged sandals of Hermes. The highlighter-green panels borrow the color and curved surface rhythm of the Talaria running shoe. The mark is original artwork, with no Nike wordmark or Swoosh.
 
 ## Assets
@@ -28,7 +46,7 @@ High-contrast accent variants are supplied in the color catalog. Conversation te
 
 Keep Liquid Glass in the control layer: native toolbars, buttons and the floating message composer. Preserve quiet, ordinary surfaces behind messages, reasoning, tools and forms. Native navigation and sheets inherit the current OS treatment automatically. A compact iPhone sidebar includes a direct connection action instead of an empty list.
 
-The shared controls use the system glass APIs on iOS/macOS 26 and later, including OS 27 refinements. Older runtimes receive system material and bordered-button fallbacks. Custom glass becomes an opaque semantic surface when Reduce Transparency or Increase Contrast is enabled. No custom motion is added. Controls use semantic fonts; primary iPhone actions and attachment removal have generous touch targets.
+The shared controls use the system glass APIs on iOS/macOS 26 and later, including OS 27 refinements. Older runtimes receive system material and bordered-button fallbacks. Custom glass becomes an opaque semantic surface when Reduce Transparency or Increase Contrast is enabled. The original version added no custom motion; the new activity indicators add a reduced-motion-aware pulse. Controls use semantic fonts; primary iPhone actions and attachment removal have generous touch targets.
 
 Build with Xcode 27. Both targets use the same `.icon` document. The explicit `type: file` resource entry in `project.yml` preserves the document as a bundle with the installed XcodeGen 2.44.1. Regenerate the project with `xcodegen generate` after changing its build settings. Asset compilation produces the runtime variants and older-OS fallback icons.
 
