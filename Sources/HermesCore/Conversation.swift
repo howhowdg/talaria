@@ -22,13 +22,25 @@ public struct SessionSummary: Identifiable, Equatable, Sendable {
     public var title: String
     public var preview: String
     public var messageCount: Int
+    /// The stored conversation's start time, not its latest activity. The pinned
+    /// session.list contract exposes started_at as Unix seconds and uses 0 when absent.
+    public var startedAt: Date?
     public init(json: JSONValue) {
         id = StoredSessionID(rawValue: json["id"]?.stringValue ?? "")
         title = json["title"]?.stringValue ?? ""
         preview = json["preview"]?.stringValue ?? ""
         messageCount = json["message_count"]?.intValue ?? 0
+        startedAt = Self.startDate(json["started_at"])
     }
     public var displayTitle: String { title.isEmpty ? "Untitled conversation" : title }
+
+    private static func startDate(_ value: JSONValue?) -> Date? {
+        guard let value, case .number(let seconds) = value, seconds.isFinite,
+              seconds > 0, seconds < 253_402_300_800 else { return nil }
+        // Keep calendar dates before year 10000; reject malformed/out-of-range
+        // values rather than guessing milliseconds or manufacturing a recent date.
+        return Date(timeIntervalSince1970: seconds)
+    }
 }
 public enum MessageRole: String, Sendable, Codable { case user, assistant, tool, system }
 public struct ChatMessage: Identifiable, Equatable, Sendable {
