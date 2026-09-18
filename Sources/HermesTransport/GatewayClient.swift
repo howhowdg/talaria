@@ -96,6 +96,9 @@ public actor GatewayClient {
             guard response.status != 401 && response.status != 403 else {
                 throw GatewayTransportError.authenticationRejected
             }
+            if response.status == 400, Self.isKnownHostRejection(response.data) {
+                throw GatewayTransportError.hostRejected
+            }
             guard (200..<300).contains(response.status) else { throw GatewayTransportError.httpStatus(response.status) }
             let status = try JSONDecoder().decode(JSONValue.self, from: response.data)
             guard status.objectValue != nil else { throw GatewayTransportError.invalidResponse }
@@ -345,6 +348,14 @@ public actor GatewayClient {
     }
 
     private func removeSubscriber(_ id: UUID) { subscribers.removeValue(forKey: id) }
+    private static func isKnownHostRejection(_ data: Data) -> Bool {
+        // Recognize only Hermes's exact diagnostic, in a small JSON response.
+        // Never display arbitrary server text or change Host/authentication policy.
+        struct StatusFailure: Decodable { let detail: String }
+        guard data.count <= 4_096,
+              let failure = try? JSONDecoder().decode(StatusFailure.self, from: data) else { return false }
+        return failure.detail == "Invalid Host header. Dashboard requests must use the hostname the server was bound to."
+    }
     private func publish(_ update: GatewayUpdate) {
         var overflowed = false
         for stream in subscribers.values {

@@ -608,7 +608,9 @@ public final class HermesAppModel {
             releaseSnapshotWaiters()
             cancelAttachmentTransfers()
             pendingRequests = [:]
-            if let reason { banner = reason + " Reconnect to restore the conversation." }
+            if let reason {
+                banner = conversations.isEmpty ? reason : reason + " Reconnect to restore the conversation."
+            }
             for id in conversations.keys { conversations[id]?.pendingInputs = [] }
         case .snapshot(_, let result):
             defer { if generation == stamp { finishSnapshot(result) } }

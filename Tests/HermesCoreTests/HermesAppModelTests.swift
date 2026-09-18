@@ -99,6 +99,20 @@ final class HermesAppModelTests: XCTestCase {
         XCTAssertTrue(condition(), "Expected the ordered update stream to settle")
     }
 
+    func testDisconnectOnlyOffersConversationRestorationWhenAConversationExists() async throws {
+        for hasConversation in [false, true] {
+            let (model, factory, directory, _) = try fixture()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            await model.connect(to: endpoint(), token: "fixture-token")
+            if hasConversation { await model.newConversation() }
+            let socket = try XCTUnwrap(factory.sockets.last)
+            await socket.close()
+            await settle { !model.isConnected && model.banner != nil }
+            XCTAssertEqual(model.banner?.contains("Reconnect to restore the conversation."), hasConversation)
+            await model.disconnect()
+        }
+    }
+
     func testProfileRoundTripRestoresEachScopedDraftAndSelection() async throws {
         let (model, factory, directory, _) = try fixture()
         defer { try? FileManager.default.removeItem(at: directory) }

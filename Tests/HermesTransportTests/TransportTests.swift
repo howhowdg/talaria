@@ -178,6 +178,72 @@ final class TransportTests: XCTestCase {
         }
     }
 
+    func testKnownHostRejectionProvidesSafeTunnelGuidanceWithoutOpeningSocket() async throws {
+        let token = "do-not-expose-host-test-token"
+        let http = StubHTTP(payload: #"{"detail":"Invalid Host header. Dashboard requests must use the hostname the server was bound to.","debug":"server-private-details do-not-expose-host-test-token"}"#, status: 400)
+        let socket = ScriptedSocket()
+        let client = GatewayClient(http: http, socketFactory: { _ in
+            XCTFail("A rejected status request must not open a WebSocket")
+            return socket
+        })
+        var updates = await client.updates().makeAsyncIterator()
+        do {
+            try await client.connect(to: endpoint(), token: token)
+            XCTFail("Expected hostname rejection")
+        } catch {
+            XCTAssertEqual(error as? GatewayTransportError, .hostRejected)
+            XCTAssertTrue(error.localizedDescription.contains("SSH tunnel"))
+            XCTAssertTrue(error.localizedDescription.contains("127.0.0.1"))
+            XCTAssertFalse(error.localizedDescription.contains(token))
+            XCTAssertFalse(error.localizedDescription.contains("server-private-details"))
+        }
+        guard case .disconnected(let diagnostic) = await updates.next() else {
+            return XCTFail("Expected the safe disconnect diagnostic")
+        }
+        XCTAssertEqual(diagnostic, GatewayTransportError.hostRejected.localizedDescription)
+        let requests = await http.requests
+        XCTAssertEqual(requests.count, 1, "Do not retry with an altered Host header")
+        XCTAssertNil(requests.first?.value(forHTTPHeaderField: "Host"))
+        let frames = await socket.frames()
+        XCTAssertTrue(frames.isEmpty, "Do not send capabilities after a failed HTTP handshake")
+    }
+
+    func testUnrecognizedOrUnboundedHTTPFailureKeepsGenericDiagnostic() async throws {
+        let knownDetail = "Invalid Host header. Dashboard requests must use the hostname the server was bound to."
+        let cases: [(payload: String, status: Int)] = [
+            (#"{"detail":"server-private-details do-not-expose"}"#, 400),
+            (#"{"detail":"\#(knownDetail) do-not-expose"}"#, 400),
+            (#"{"detail":["\#(knownDetail)"]}"#, 400),
+            (#""\#(knownDetail)""#, 400),
+            ("<html>\(knownDetail) server-private-details do-not-expose</html>", 400),
+            (#"{"detail":"\#(knownDetail)""#, 400),
+            (#"{"detail":"\#(knownDetail)","padding":"\#(String(repeating: "x", count: 4_096))"}"#, 400),
+            (#"{"detail":"\#(knownDetail)"}"#, 500)
+        ]
+        for (payload, status) in cases {
+            let socket = ScriptedSocket()
+            let http = StubHTTP(payload: payload, status: status)
+            let client = GatewayClient(http: http, socketFactory: { _ in
+                XCTFail("A failed status request must not open a WebSocket")
+                return socket
+            })
+            do {
+                try await client.connect(to: endpoint(), token: "do-not-expose")
+                XCTFail("Expected HTTP failure")
+            } catch {
+                XCTAssertEqual(error as? GatewayTransportError, .httpStatus(status))
+                XCTAssertEqual(error.localizedDescription, GatewayTransportError.httpStatus(status).localizedDescription)
+                XCTAssertFalse(error.localizedDescription.contains("do-not-expose"))
+                XCTAssertFalse(error.localizedDescription.contains("server-private-details"))
+            }
+            let requests = await http.requests
+            XCTAssertEqual(requests.count, 1)
+            XCTAssertNil(requests.first?.value(forHTTPHeaderField: "Host"))
+            let frames = await socket.frames()
+            XCTAssertTrue(frames.isEmpty)
+        }
+    }
+
     func testPendingRequestTimeoutCancellationAndDisconnectDoNotRetry() async throws {
         let socket = ScriptedSocket()
         let client = client(socket: socket)
