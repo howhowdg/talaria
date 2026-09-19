@@ -1,0 +1,12 @@
+{
+  "name": "talaria-landing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Talaria landing page, faithful to the supplied design. No runtime dependencies.",
+  "scripts": {
+    "dev": "python3 -m http.server 4173 --bind 127.0.0.1 --directory dist",
+    "preview": "python3 -m http.server 4173 --bind 127.0.0.1 --directory dist",
+    "check": "python3 scripts/check.py",
+    "build": "npm run check"
+  }
+}
