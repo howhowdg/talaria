@@ -2,9 +2,9 @@
 """Launch an installed Debug Talaria app with the synthetic iPhone UI fixture.
 
 Start scripts/fixtures/mobile_design_gateway.py separately, then run:
-    python3 scripts/preview_ios_design.py --device <SIMULATOR-UDID> --tab Chat
+    python3 scripts/preview_ios_design.py --device <SIMULATOR-UDID> --tab Home
     python3 scripts/preview_ios_design.py --device <SIMULATOR-UDID> \
-        --tab Chat --session approval --keyboard
+        --tab Home --destination approval --keyboard
 
 Requires a booted Simulator with com.talaria.native.ios already installed. This
 runner does not build, install, boot a device, or start a gateway. It replaces
@@ -92,9 +92,13 @@ def device_id(value: str) -> str:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--device", type=device_id, required=True, help="UDID of an already booted Simulator")
-    parser.add_argument("--tab", choices=("Chat", "Sessions", "Updates", "Skills", "Files"), default="Chat")
-    parser.add_argument("--session", choices=("chat", "approval"), default="chat")
-    parser.add_argument("--keyboard", action="store_true", help="Focus the composer in the Chat preview")
+    parser.add_argument("--tab", choices=("Home", "Workspaces", "Automations", "Activity"), default="Home")
+    parser.add_argument("--session", choices=("home", "chat", "approval", "inbox"), default="home")
+    parser.add_argument("--destination", choices=("workspace", "approval", "automation", "run", "failed-run", "no-output", "conversation", "discuss", "activity-request"))
+    parser.add_argument("--home", choices=("selected", "unselected", "unavailable"), default="selected")
+    parser.add_argument("--appearance", choices=("system", "dark"), default="system")
+    parser.add_argument("--large-type", action="store_true", help="Use accessibility text size within this preview only")
+    parser.add_argument("--keyboard", action="store_true", help="Focus the composer in the conversation preview")
     parser.add_argument("--handoff", type=Path, default=HANDOFF)
     args = parser.parse_args(argv)
     try:
@@ -106,7 +110,9 @@ def main(argv=None) -> int:
     environment = {key: value for key, value in os.environ.items() if not key.startswith(PREFIX)}
     environment.update({PREFIX + "PREVIEW": "1", PREFIX + "URL": url, PREFIX + "TOKEN": token,
                         PREFIX + "SESSION": session_id, PREFIX + "TAB": args.tab,
-                        PREFIX + "KEYBOARD": "1" if args.keyboard else "0"})
+                        PREFIX + "KEYBOARD": "1" if args.keyboard else "0", PREFIX + "HOME": args.home,
+                        PREFIX + "DESTINATION": args.destination or "", PREFIX + "APPEARANCE": args.appearance,
+                        PREFIX + "LARGE_TYPE": "1" if args.large_type else "0"})
     command = ["xcrun", "simctl", "launch", "--terminate-running-process", args.device, BUNDLE_ID]
     try:
         result = subprocess.run(command, env=environment, stdin=subprocess.DEVNULL,

@@ -25,6 +25,7 @@ private actor ActivityFixture {
     func read(_ endpoint: GatewayReadEndpoint) throws -> JSONValue {
         reads.append(endpoint)
         switch endpoint {
+        case .telegramTopics: throw MobileActivityError.unavailable
         case .schedules:
             if failSchedules { throw MobileActivityError.unavailable }
             return .array((0..<scheduleCount).map { .object([
@@ -81,7 +82,7 @@ final class MobileActivityTests: XCTestCase, @unchecked Sendable {
         let snapshot = try await service(fixture).load(profile: "work")
         XCTAssertTrue(snapshot.runs.isEmpty)
         XCTAssertEqual(snapshot.skills.map(\.name), ["notes"])
-        XCTAssertEqual(snapshot.notices, ["Schedules could not be loaded. Pull to refresh."])
+        XCTAssertEqual(snapshot.notices, ["Automations could not be loaded. Pull to refresh."])
     }
 
     func testMalformedDatesStayUnknown() throws {
@@ -95,6 +96,7 @@ final class MobileActivityTests: XCTestCase, @unchecked Sendable {
             method == "skills.manage" ? .object(["skills": .object([:])]) : .object(["projects": .array([])])
         }, read: { resource in
             switch resource {
+            case .telegramTopics: throw MobileActivityError.unavailable
             case .schedules: return .array([
                 .object(["id": .string("foreign"), "profile": .string("personal")]),
                 .object(["id": .string("work-job"), "profile": .string("work")])])
@@ -109,7 +111,7 @@ final class MobileActivityTests: XCTestCase, @unchecked Sendable {
         let snapshot = try await service.load(profile: "work")
         XCTAssertEqual(snapshot.schedules.map(\.id), ["work-job"])
         XCTAssertEqual(snapshot.runs.map(\.summary), [""])
-        XCTAssertEqual(snapshot.notices, ["Some run summaries are unavailable; open the conversation to read its history."])
+        XCTAssertEqual(snapshot.notices, ["Some run results are unavailable; open the run to retry."])
     }
 
     func testSummaryUsesDisplayProjectionAndNeverRawCompactionCarrier() async throws {
@@ -117,6 +119,7 @@ final class MobileActivityTests: XCTestCase, @unchecked Sendable {
             method == "skills.manage" ? .object(["skills": .object([:])]) : .object(["projects": .array([])])
         }, read: { resource in
             switch resource {
+            case .telegramTopics: throw MobileActivityError.unavailable
             case .schedules: return .array([.object(["id": .string("job")])])
             case .scheduleRuns: return .object(["runs": .array([.object(["id": .string("run")])])])
             case .sessionMessages:

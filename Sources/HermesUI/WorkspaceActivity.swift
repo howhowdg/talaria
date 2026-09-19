@@ -234,8 +234,8 @@ public struct WorkspaceStatusStack: View {
             if let state {
                 if !state.pendingInputs.isEmpty {
                     Label(state.pendingInputs.count == 1 ? "Waiting for your answer" : "\(state.pendingInputs.count) answers needed",
-                          systemImage: "hand.raised")
-                        .foregroundStyle(ActivityAppearance.accent)
+                          systemImage: "exclamationmark.circle.fill")
+                        .foregroundStyle(TalariaStyle.attention)
                 }
                 reportedActivity(state, todos: todoCache.todos(matching: todoInput))
             } else {

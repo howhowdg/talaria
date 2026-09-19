@@ -5,6 +5,8 @@ import HermesProtocol
 /// cannot supply an arbitrary URL or change the credential's origin.
 public enum GatewayReadEndpoint: Sendable, Equatable {
     case schedules
+    /// Optional Talaria host extension. A 404 means topic discovery is unavailable.
+    case telegramTopics
     case scheduleRuns(id: String, limit: Int)
     case sessionMessages(id: String, limit: Int)
 }
@@ -22,9 +24,22 @@ public struct GatewayReader: Sendable {
         self.endpoint = endpoint; self.token = token; self.http = http
     }
 
+    public func setAutomationEnabled(id: String, enabled: Bool) async throws -> JSONValue {
+        try await perform(GatewayRoutes(endpoint: endpoint).automationRequest(id: id, action: enabled ? "resume" : "pause", token: token))
+    }
+
+    public func triggerAutomation(id: String) async throws -> JSONValue {
+        try await perform(GatewayRoutes(endpoint: endpoint).automationRequest(id: id, action: "trigger", token: token))
+    }
+
     public func read(_ resource: GatewayReadEndpoint) async throws -> JSONValue {
         try Task.checkCancellation()
         let request = try GatewayRoutes(endpoint: endpoint).readRequest(resource, token: token)
+        return try await perform(request)
+    }
+
+    private func perform(_ request: URLRequest) async throws -> JSONValue {
+        try Task.checkCancellation()
         let response = try await http.data(for: request)
         try Task.checkCancellation()
         guard response.status != 401 && response.status != 403 else {
@@ -50,6 +65,7 @@ extension GatewayRoutes {
         var query = [URLQueryItem(name: "profile", value: endpoint.profile)]
         switch resource {
         case .schedules: suffix = "/cron/jobs"
+        case .telegramTopics: suffix = "/talaria/telegram/topics"
         case .scheduleRuns(let id, let limit):
             suffix = "/cron/jobs/\(try encodedSegment(id))/runs"
             query.append(URLQueryItem(name: "limit", value: String(max(1, min(limit, 20)))))
@@ -64,6 +80,18 @@ extension GatewayRoutes {
         route.queryItems = query
         guard let resolved = route.url else { throw GatewayTransportError.invalidEndpoint }
         request.url = resolved; request.httpMethod = "GET"; request.timeoutInterval = 30
+        return request
+    }
+
+    func automationRequest(id: String, action: String, token: String) throws -> URLRequest {
+        guard ["resume", "pause", "trigger"].contains(action) else { throw GatewayTransportError.invalidResponse }
+        var request = try readRequest(.scheduleRuns(id: id, limit: 1), token: token)
+        guard let url = request.url, var route = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            throw GatewayTransportError.invalidEndpoint
+        }
+        route.percentEncodedPath = String(route.percentEncodedPath.dropLast("runs".count)) + action
+        route.queryItems = [URLQueryItem(name: "profile", value: endpoint.profile)]
+        request.url = route.url; request.httpMethod = "POST"; request.timeoutInterval = 60
         return request
     }
 

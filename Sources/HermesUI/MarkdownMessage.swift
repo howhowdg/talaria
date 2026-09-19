@@ -6,12 +6,16 @@ import SwiftUI
 public struct MarkdownMessage: View {
     public let text: String
     public let isStreaming: Bool
+    public var fillsWidth: Bool
+    public var foregroundColor: Color?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var cursorBright = false
 
-    public init(text: String, isStreaming: Bool = false) {
+    public init(text: String, isStreaming: Bool = false, fillsWidth: Bool = true, foregroundColor: Color? = nil) {
         self.text = text
         self.isStreaming = isStreaming
+        self.fillsWidth = fillsWidth
+        self.foregroundColor = foregroundColor
     }
 
     public var body: some View {
@@ -22,7 +26,7 @@ public struct MarkdownMessage: View {
             }
             if blocks.isEmpty && isStreaming { TalariaStreamingCursor() }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
         .textSelection(.enabled)
         #if os(macOS)
         .modifier(MacMarkdownRendering())
@@ -50,7 +54,7 @@ public struct MarkdownMessage: View {
                 .accessibilityAddTraits(.isHeader)
         case .listItem(let marker, let value, let indent):
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(marker).foregroundStyle(.secondary).monospacedDigit()
+                Text(marker).foregroundStyle(foregroundColor ?? .secondary).monospacedDigit()
                     .frame(minWidth: 14, alignment: .trailing)
                 inline(value, streaming: streaming).frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -58,7 +62,7 @@ public struct MarkdownMessage: View {
         case .quote(let value):
             HStack(alignment: .top, spacing: 10) {
                 RoundedRectangle(cornerRadius: 2).fill(.tertiary).frame(width: 3)
-                inline(value, streaming: streaming).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                inline(value, streaming: streaming).foregroundStyle(foregroundColor ?? .secondary).frame(maxWidth: .infinity, alignment: .leading)
             }
             .fixedSize(horizontal: false, vertical: true)
         case .code(let language, let value):
@@ -66,7 +70,7 @@ public struct MarkdownMessage: View {
                 if !language.isEmpty {
                     Text(language)
                         #if os(macOS)
-                        .font(T.f(10, .medium)).foregroundStyle(T.ink2)
+                        .font(T.f(10, .medium)).foregroundStyle(foregroundColor ?? T.ink2)
                         #else
                         .font(TalariaTypography.caption.weight(.medium)).foregroundStyle(.secondary)
                         #endif
@@ -99,6 +103,7 @@ public struct MarkdownMessage: View {
         var parsed = (try? AttributedString(markdown: value, options: .init(
             interpretedSyntax: .inlineOnlyPreservingWhitespace,
             failurePolicy: .returnPartiallyParsedIfPossible))) ?? AttributedString(value)
+        if let foregroundColor { parsed.foregroundColor = foregroundColor }
         #if os(macOS)
         if #available(macOS 15.0, *) {
             var content = Text("")
@@ -130,7 +135,7 @@ public struct MarkdownMessage: View {
         // The inline cursor follows the last rendered run and wraps with it.
         #if os(macOS)
         let cursor = Text(Image(nsImage: Self.cursorImage)).baselineOffset(-2)
-            .foregroundColor(T.fill.opacity(reduceMotion || cursorBright ? 1 : 0.35))
+            .foregroundColor((foregroundColor ?? T.fill).opacity(reduceMotion || cursorBright ? 1 : 0.35))
         #else
         let cursor = Text("█").font(.system(.body, design: .monospaced))
             .foregroundColor(TalariaStyle.prominentAccent.opacity(reduceMotion || cursorBright ? 1 : 0.35))

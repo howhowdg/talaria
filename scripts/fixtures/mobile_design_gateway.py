@@ -36,6 +36,7 @@ import uvicorn
 FIXTURE_KIND = "synthetic-mobile-design-only"
 MODEL = "design-fixture-model"
 PROFILE = "default"
+HOME = "design-home"
 CHAT = "design-lisbon-weekend"
 APPROVAL = "design-downloads-review"
 
@@ -62,13 +63,31 @@ class DesignFixture:
         self.now = now.timestamp()
         self.morning = morning.timestamp()
         self.sessions = self.seed_sessions()
+        self.automations = {
+            "design-morning": {"id": "design-morning", "name": "Morning Brief", "profile": PROFILE,
+                "enabled": True, "schedule_display": "Daily · 7:00", "last_run_at": self.morning,
+                "next_run_at": self.morning + 86400, "prompt_preview": "A short look at your day: calendar, messages and anything that needs your attention."},
+            "design-projects": {"id": "design-projects", "name": "Weekly Review", "profile": PROFILE,
+                "enabled": False, "schedule_display": "Friday · 17:00", "prompt_preview": "Review the week and prepare the next steps."},
+            "design-reading": {"id": "design-reading", "name": "Weekend Reading", "profile": PROFILE,
+                "enabled": True, "schedule_display": "Friday · 16:00", "next_run_at": self.now + 86400,
+                "prompt_preview": "A few things worth a longer read."},
+        }
+        self.run_owners = {"design-inbox-run": "design-morning", "design-project-run": "design-projects",
+                           "design-reading-run": "design-reading", "design-empty-run": "design-morning"}
         self.app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
         self.install_routes()
 
     def seed_sessions(self):
         itinerary = "# A weekend in Lisbon\n\n## Friday\nArrive, settle in and find dinner in Príncipe Real.\n\n## Saturday\nTram through Graça, then a quiet afternoon by the river.\n\n## Sunday\nCoffee, a walk and time to wander."
         records = [
-            (CHAT, "A weekend in Lisbon", "/Design Fixture/Travel", self.now - 900, [
+            (HOME, "General chat with Hermes", "/Design Fixture/Personal", self.now - 7200, [
+                message("user", "Ana and I want Lisbon the second weekend of October. Take it on properly — flights, stay, under €900 for two."),
+                message("assistant", "I’ve opened **Plan a trip** so we can keep the travel details together. Your Home stays here."),
+                message("user", "What did I tell the landlord about the boiler?"),
+                message("assistant", "Repair by the 20th, deposit talk after. That’s in an older conversation — pull it in here?"),
+            ]),
+            (CHAT, "Plan a trip", "/Design Fixture/Travel", self.now - 900, [
                 message("user", "Plan a long weekend in Lisbon. Keep Friday light, and find somewhere walkable to stay."),
                 message("assistant", "Friday looks clear. I’m pulling together flights, a place to stay and a slower Saturday.", reasoning="I’ll keep arrival day flexible and group the weekend around walkable neighborhoods."),
                 tool("Calendar", {"query": "Friday through Sunday"}, {"available": True}),
@@ -77,21 +96,34 @@ class DesignFixture:
                 tool("write_file", {"path": "/Design Fixture/Travel/itinerary.md", "content": itinerary}, {"success": True, "bytes_written": len(itinerary)}),
                 message("assistant", "I’d stay near **Príncipe Real**: good cafés, easy walks and a little breathing room. Your first draft is ready in `itinerary.md`."),
             ]),
-            (APPROVAL, "Tidy up Downloads", "/Design Fixture/Downloads", self.now - 1800, [
-                message("user", "Help me tidy up the older files in Downloads."),
-                message("assistant", "I found 142 files older than 30 days — mostly installers and PDFs. I’d like to move them into Downloads/Archive."),
+            (APPROVAL, "Build Talaria", "/Design Fixture/Downloads", self.now - 1800, [
+                message("user", "Check the session list source and prepare the change."),
+                message("assistant", "The source field now stays attached to each session. The regression checks pass. May I record this change?"),
             ]),
             ("design-inbox-run", "Your morning inbox", "/Design Fixture/Personal", self.morning, [
                 message("user", "Review the synthetic inbox and prepare a morning summary."),
-                message("assistant", "Three messages need a reply. The Lisbon booking is confirmed, Maya shared the project notes, and your reading list is ready for the weekend."),
+                tool("calendar", {"range": "today"}, {"meetings": 3}),
+                message("assistant", "## Friday, 18 September\n\n- **Three meetings** today: planning at 10, lunch with Maya at 12:30, and a review at 3.\n- The landlord confirmed the **boiler repair for Monday**. No reply needed.\n- Your Lisbon planning is ready to pick up in **Plan a trip**."),
             ]),
             ("design-project-run", "Project folder review", "/Design Fixture/Work", self.morning - 1200, [
                 message("user", "Review the synthetic project folders."),
-                message("assistant", "The project notes are organized. Two drafts are ready to review, and the release checklist is up to date."),
+                message("system", "Calendar connection timed out. This run did not complete."),
             ]),
             ("design-reading-run", "A little weekend reading", "/Design Fixture/Personal", self.now - 86400, [
                 message("user", "Prepare a short synthetic reading list."),
                 message("assistant", "Five pieces saved for the weekend: architecture, a new trail, and a thoughtful essay on making time for creative work."),
+            ]),
+            ("design-empty-run", "Morning Brief · earlier", "/Design Fixture/Personal", self.now - 86400, [
+                message("user", "Prepare the synthetic morning brief."),
+                message("assistant", "[SILENT]"),
+            ]),
+            ("design-landlord", "Rewrite the landlord email about the deposit and the boiler", "/Design Fixture/Personal", self.now - 3600, [
+                message("user", "Keep the repair request friendly and brief."),
+                message("assistant", "Here’s a short draft of your repair request."),
+            ]),
+            ("design-bikes", "Compare three e-bikes", "/Design Fixture/Personal", self.now - 3800, [
+                message("user", "Compare these three e-bikes for a short commute."),
+                message("assistant", "Let’s compare weight, battery range and comfort for your route."),
             ]),
             ("design-sunday-notes", "Sunday notes", "/Design Fixture/Personal", self.now - 90000, [
                 message("user", "Keep a few ideas for Sunday."),
@@ -100,7 +132,7 @@ class DesignFixture:
         ]
         return {sid: {"id": sid, "runtime": "runtime-" + sid, "title": title,
                       "cwd": cwd, "started_at": started, "messages": rows,
-                      "running": sid in (CHAT, APPROVAL)}
+                      "running": sid in (CHAT, APPROVAL), "source": "telegram" if sid == CHAT else "cron" if sid.endswith("-run") else "native"}
                 for sid, title, cwd, started, rows in records}
 
     def authenticated(self, supplied: str | None):
@@ -119,8 +151,8 @@ class DesignFixture:
     def approval(self):
         return {"jsonrpc": "2.0", "id": "design-approval-1", "method": "approval", "params": {
             "session_id": self.sessions[APPROVAL]["runtime"], "gateway_session_id": APPROVAL,
-            "profile": PROFILE, "description": "Move 142 files", "tool_name": "Downloads → Downloads/Archive",
-            "command": "Xcode_27.0.dmg        4.1 GB\nIMG_9603.png … IMG_9608    6 files\ninvoice-2026-03.pdf       …138 more",
+            "profile": PROFILE, "description": "Allow a command?", "tool_name": "terminal",
+            "command": "git commit -am \"Fix session list source\"",
             "choices": ["once", "session", "always", "deny"], "allow_session": True,
             "allow_permanent": True, "smart_denied": False,
         }}
@@ -131,7 +163,7 @@ class DesignFixture:
             row["row_id"] = index + 1
         result = {"session_id": record["runtime"], "stored_session_id": record["id"],
                 "profile": PROFILE, "running": record["running"], "messages": rows,
-                "info": {"title": record["title"], "model": MODEL, "cwd": record["cwd"]},
+                "info": {"title": record["title"], "model": MODEL, "cwd": record["cwd"], "source": record.get("source", "native")},
                 "open_requests": [self.approval()] if record["id"] == APPROVAL and self.approval_pending else []}
         if record["id"] == CHAT and record["running"]:
             result["inflight"] = {"assistant": rows[-1]["text"]}
@@ -185,7 +217,7 @@ class DesignFixture:
         if method == "session.list":
             return {"sessions": [{"id": row["id"], "title": row["title"], "started_at": row["started_at"],
                                    "preview": next((m["text"] for m in row["messages"] if m["role"] == "user"), ""),
-                                   "message_count": len(row["messages"])}
+                                   "message_count": len(row["messages"]), "source": row.get("source", "native")}
                                   for row in sorted(self.sessions.values(), key=lambda r: r["started_at"], reverse=True)]}
         if method == "session.create":
             sid = "design-new-" + secrets.token_hex(4)
@@ -248,23 +280,43 @@ class DesignFixture:
         @self.app.get("/api/cron/jobs")
         async def schedules(request: Request):
             self.check_http(request)
-            return [{"id": "design-morning", "name": "Morning briefing", "profile": PROFILE,
-                     "enabled": True, "schedule_display": "Every morning at 8:30", "last_run_at": self.morning},
-                    {"id": "design-projects", "name": "Project review", "profile": PROFILE,
-                     "enabled": True, "schedule_display": "Weekdays at 9:00"},
-                    {"id": "design-reading", "name": "Weekend reading", "profile": PROFILE,
-                     "enabled": True, "schedule_display": "Fridays at 16:00"}]
+            return list(self.automations.values())
 
         @self.app.get("/api/cron/jobs/{job_id}/runs")
         async def runs(job_id: str, request: Request):
             self.check_http(request)
-            sid = {"design-morning": "design-inbox-run", "design-projects": "design-project-run",
-                   "design-reading": "design-reading-run"}.get(job_id)
-            if not sid:
-                raise HTTPException(404, "Synthetic schedule was not found")
-            record = self.sessions[sid]
-            return {"runs": [{"id": sid, "profile": PROFILE, "title": record["title"],
-                              "started_at": record["started_at"], "is_active": record["running"]}]}
+            if job_id not in self.automations:
+                raise HTTPException(404, "Synthetic automation was not found")
+            result = []
+            for sid, owner in self.run_owners.items():
+                if owner != job_id:
+                    continue
+                record = self.sessions[sid]
+                reason = "cron_failed" if sid == "design-project-run" else "cron_incomplete_no_output" if sid == "design-empty-run" else "cron_complete"
+                result.append({"id": sid, "profile": PROFILE, "title": record["title"],
+                    "started_at": record["started_at"], "is_active": record["running"],
+                    "ended_at": None if record["running"] else record["started_at"] + 41,
+                    "end_reason": None if record["running"] else reason})
+            return {"runs": sorted(result, key=lambda row: row["started_at"], reverse=True)}
+
+        @self.app.post("/api/cron/jobs/{job_id}/{action}")
+        async def automation_action(job_id: str, action: str, request: Request):
+            self.check_http(request)
+            if job_id not in self.automations:
+                raise HTTPException(404, "Synthetic automation was not found")
+            if action in ("pause", "resume"):
+                self.automations[job_id]["enabled"] = action == "resume"
+                return {"ok": True}
+            if action == "trigger":
+                sid = "design-rerun-" + secrets.token_hex(4)
+                self.sessions[sid] = {"id": sid, "runtime": "runtime-" + sid,
+                    "title": self.automations[job_id]["name"], "cwd": "/Design Fixture/Personal",
+                    "started_at": time.time(), "messages": [message("user", "Synthetic automation run")],
+                    "running": True, "source": "cron"}
+                self.run_owners[sid] = job_id
+                self.tasks[sid] = asyncio.create_task(self.simulated_reply(self.sessions[sid]))
+                return {"ok": True}
+            raise HTTPException(404, "Synthetic automation action was not found")
 
         @self.app.get("/api/sessions/{sid}/messages")
         async def history(sid: str, request: Request):
@@ -301,7 +353,7 @@ class DesignFixture:
                         await client.send_json({"jsonrpc": "2.0", "id": frame.get("id"), "result": result})
                     except ValueError as error:
                         await client.send_json({"jsonrpc": "2.0", "id": frame.get("id"), "error": {
-                            "code": -32602, "message": str(error)}})
+                            "code": 4007 if str(error) == "Synthetic session was not found" else -32602, "message": str(error)}})
             except WebSocketDisconnect:
                 pass
             finally:
@@ -322,7 +374,7 @@ async def main():
     port = listener.getsockname()[1]
     handoff = {"base_url": f"http://127.0.0.1:{port}", "token": fixture.token, "profile": PROFILE,
                "pid": os.getpid(), "fixture_kind": FIXTURE_KIND, "expires_at": time.time() + args.lifetime,
-               "session_ids": {"chat": CHAT, "approval": APPROVAL, "inbox": "design-inbox-run"}}
+               "session_ids": {"home": HOME, "chat": CHAT, "approval": APPROVAL, "inbox": "design-inbox-run"}}
     # Exclusive creation refuses an existing or symlinked handoff from another run.
     fd = os.open(args.handoff, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w") as output:

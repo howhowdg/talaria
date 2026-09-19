@@ -21,6 +21,8 @@ public struct SessionSummary: Identifiable, Equatable, Sendable {
     public let id: StoredSessionID
     public var title: String
     public var preview: String
+    /// Host provenance, retained without using it to infer Home or a Workspace.
+    public var source: String?
     public var messageCount: Int
     /// The stored conversation's start time, not its latest activity. The pinned
     /// session.list contract exposes started_at as Unix seconds and uses 0 when absent.
@@ -29,6 +31,7 @@ public struct SessionSummary: Identifiable, Equatable, Sendable {
         id = StoredSessionID(rawValue: json["id"]?.stringValue ?? "")
         title = json["title"]?.stringValue ?? ""
         preview = json["preview"]?.stringValue ?? ""
+        source = json["source"]?.stringValue
         messageCount = json["message_count"]?.intValue ?? 0
         startedAt = Self.startDate(json["started_at"])
     }
@@ -43,7 +46,7 @@ public struct SessionSummary: Identifiable, Equatable, Sendable {
     }
 }
 public enum MessageRole: String, Sendable, Codable { case user, assistant, tool, system }
-public struct ChatMessage: Identifiable, Equatable, Sendable {
+public struct ChatMessage: Identifiable, Equatable, Sendable, Codable {
     public let id: String
     public var role: MessageRole
     public var text: String
@@ -53,13 +56,26 @@ public struct ChatMessage: Identifiable, Equatable, Sendable {
     public var toolSummary: String?
     public var isStreaming: Bool
     public var isError: Bool
+    /// Display time supplied by a projected history row. Live messages without
+    /// a gateway timestamp remain undated until authoritative history arrives.
+    public var timestamp: Date?
     public init(id: String = UUID().uuidString, role: MessageRole, text: String,
                 reasoning: String = "", toolName: String? = nil, toolInput: String? = nil,
-                toolSummary: String? = nil, isStreaming: Bool = false, isError: Bool = false) {
+                toolSummary: String? = nil, isStreaming: Bool = false, isError: Bool = false,
+                timestamp: Date? = nil) {
         self.id = id; self.role = role; self.text = text; self.reasoning = reasoning
         self.toolName = toolName; self.toolInput = toolInput
         self.toolSummary = toolSummary
         self.isStreaming = isStreaming; self.isError = isError
+        self.timestamp = timestamp
+    }
+
+    fileprivate static func projectedTimestamp(_ value: JSONValue?) -> Date? {
+        guard let value, case .number(let seconds) = value, seconds.isFinite,
+              seconds > 0, seconds < 253_402_300_800 else { return nil }
+        // The pinned transcript contract uses Unix seconds; do not guess units
+        // for malformed values or replace an unknown time with the current time.
+        return Date(timeIntervalSince1970: seconds)
     }
 }
 public struct PendingInput: Identifiable, Equatable, Sendable {
@@ -110,7 +126,8 @@ public struct ConversationState: Equatable, Sendable {
                 role: role, text: row["text"]?.stringValue ?? "",
                 reasoning: row["reasoning"]?.stringValue ?? "",
                 toolName: row["name"]?.stringValue,
-                toolInput: row["args"].map(Self.describe), toolSummary: row["context"]?.stringValue)
+                toolInput: row["args"].map(Self.describe), toolSummary: row["context"]?.stringValue,
+                timestamp: ChatMessage.projectedTimestamp(row["timestamp"]))
         }
         pendingInputs = []
         isRunning = snapshot["running"]?.boolValue ?? info?["running"]?.boolValue ?? false

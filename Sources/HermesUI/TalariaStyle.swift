@@ -2,6 +2,9 @@ import SwiftUI
 
 /// Shared identity with precise Mac handoff metrics and adaptive iOS controls.
 public enum TalariaStyle {
+    /// Reserved for decisions that require the user's attention.
+    public static var attention: Color { Color("TalariaAttention", bundle: .module) }
+    public static var attentionTint: Color { Color("TalariaAttentionTint", bundle: .module) }
     /// Readable brand tint for links, template images and small labels.
     public static var accent: Color {
         #if os(macOS)
@@ -31,7 +34,11 @@ public enum TalariaStyle {
         #if os(macOS)
         Color(nsColor: .textBackgroundColor)
         #else
-        Color(uiColor: .secondarySystemBackground)
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0x22/255, green: 0x25/255, blue: 0x2B/255, alpha: 1)
+                : UIColor(red: 0xF1/255, green: 0xF2/255, blue: 0xF5/255, alpha: 1)
+        })
         #endif
     }
 
@@ -50,9 +57,13 @@ public enum TalariaStyle {
 
     static var solidControlSurface: Color {
         #if os(macOS)
-        Color(nsColor: .windowBackgroundColor)
+        T.opaquePanel
         #else
-        Color(uiColor: .secondarySystemBackground)
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0x22/255, green: 0x25/255, blue: 0x2B/255, alpha: 1)
+                : UIColor(red: 0xF1/255, green: 0xF2/255, blue: 0xF5/255, alpha: 1)
+        })
         #endif
     }
 }
@@ -103,7 +114,7 @@ public struct TalariaBrandLockup: View {
     public var body: some View {
         HStack(spacing: -3) {
             #if os(macOS)
-            TalariaMark(size: 28)
+            TalariaMark(size: 26)
             TalariaWordmark().padding(.top, 3)
             #else
             TalariaMark(size: markSize)

@@ -24,7 +24,7 @@ extension View {
 enum IOSDesign {
     static var background: Color {
         Color(uiColor: UIColor { traits in
-            traits.userInterfaceStyle == .dark ? UIColor(red: 0.065, green: 0.075, blue: 0.095, alpha: 1)
+            traits.userInterfaceStyle == .dark ? UIColor(red: 21/255, green: 23/255, blue: 27/255, alpha: 1)
                 : UIColor(red: 244/255, green: 244/255, blue: 246/255, alpha: 1)
         })
     }
@@ -39,11 +39,16 @@ private struct IOSCard: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
-            .background((scheme == .dark ? Color(uiColor: .secondarySystemGroupedBackground) : .white)
-                .opacity(reduceTransparency || contrast == .increased ? 1 : opacity), in: shape)
+            .background(cardFill, in: shape)
             .overlay(shape.strokeBorder(contrast == .increased ? Color.primary.opacity(0.3)
                                         : .white.opacity(scheme == .dark ? 0.12 : 0.9), lineWidth: 1))
             .shadow(color: .black.opacity(0.04), radius: 2, y: 1)
+    }
+    private var cardFill: Color {
+        if reduceTransparency || contrast == .increased {
+            return scheme == .dark ? Color(red: 34/255, green: 37/255, blue: 43/255) : .white
+        }
+        return .white.opacity(scheme == .dark ? 0.08 : opacity)
     }
 }
 

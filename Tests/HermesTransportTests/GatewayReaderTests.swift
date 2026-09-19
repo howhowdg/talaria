@@ -51,3 +51,31 @@ final class GatewayReaderTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(result, .array([]))
     }
 }
+
+extension GatewayReaderTests {
+    func testAutomationMutationsPreserveOriginProfileAndDoNotRetry() async throws {
+        let http = ReaderHTTP("{}")
+        let reader = GatewayReader(endpoint: endpoint, token: "secret", http: http)
+        _ = try await reader.setAutomationEnabled(id: "id/with?special", enabled: false)
+        _ = try await reader.setAutomationEnabled(id: "id/with?special", enabled: true)
+        _ = try await reader.triggerAutomation(id: "id/with?special")
+        let requests = await http.requests
+        XCTAssertEqual(requests.count, 3)
+        for (index, action) in ["pause", "resume", "trigger"].enumerated() {
+            let request = requests[index]
+            let route = try XCTUnwrap(URLComponents(url: XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(route.host, "example.test")
+            XCTAssertEqual(route.percentEncodedPath, "/hermes/api/cron/jobs/id%2Fwith%3Fspecial/\(action)")
+            XCTAssertEqual(route.queryItems, [URLQueryItem(name: "profile", value: "work / private")])
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-Hermes-Session-Token"), "secret")
+        }
+        let ambiguous = ReaderHTTP("host detail", status: 503)
+        do {
+            _ = try await GatewayReader(endpoint: endpoint, token: "secret", http: ambiguous).triggerAutomation(id: "id")
+            XCTFail("Expected failure")
+        } catch { XCTAssertEqual(error as? GatewayTransportError, .httpStatus(503)) }
+        let attempts = await ambiguous.requests
+        XCTAssertEqual(attempts.count, 1)
+    }
+}

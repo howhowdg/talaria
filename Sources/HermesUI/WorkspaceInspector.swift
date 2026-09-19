@@ -8,6 +8,8 @@ import HermesProtocol
 public struct WorkspaceInspector: View {
     public let state: ConversationState?
     public let attachments: [AttachmentItem]
+    private let pane: WorkspaceInspectorPane?
+    private let recordedInput: InspectorInput?
 
     @State private var tab: InspectorTab = .files
     @State private var selectedFileID: String?
@@ -18,15 +20,23 @@ public struct WorkspaceInspector: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
 
-    public init(state: ConversationState?, attachments: [AttachmentItem]) {
+    public init(state: ConversationState?, attachments: [AttachmentItem], pane: WorkspaceInspectorPane? = nil) {
         self.state = state
         self.attachments = attachments
+        self.pane = pane
+        recordedInput = nil
+    }
+
+    public init(run: AutomationRunDetail, owner: SessionOwner, pane: WorkspaceInspectorPane) {
+        state = nil; attachments = []; self.pane = pane
+        recordedInput = InspectorInput(messages: run.messages,
+            scope: InspectorScope(owner: owner, storedID: StoredSessionID(rawValue: run.runID), cwd: ""))
     }
 
     public var body: some View {
-        let input = InspectorInput(state: state, attachments: attachments)
+        let input = recordedInput ?? InspectorInput(state: state, attachments: attachments)
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 2) {
+            if pane == nil { HStack(spacing: 2) {
                 inspectorTab(.files, title: "Files")
                 inspectorTab(.sources, title: "Sources",
                              count: scope == input.scope ? snapshot.sources.count : 0)
@@ -35,8 +45,9 @@ public struct WorkspaceInspector: View {
             }
             .padding(.horizontal, 10).frame(height: 52)
             panelDivider
+            }
 
-            if state == nil {
+            if state == nil && recordedInput == nil {
                 emptyState("Select a conversation", symbol: "sidebar.right",
                            detail: "Files, sources and command output appear here as Hermes uses them.")
             } else if scope != input.scope {
@@ -45,7 +56,7 @@ public struct WorkspaceInspector: View {
                 emptyState("Updating workspace", symbol: "arrow.triangle.2.circlepath",
                            detail: "Loading this conversation’s recorded activity.")
             } else {
-                switch tab {
+                switch pane == .terminal ? InspectorTab.terminal : pane == .files ? .files : tab {
                 case .files: filesPane
                 case .sources: sourcesPane
                 case .terminal: terminalPane
@@ -53,10 +64,11 @@ public struct WorkspaceInspector: View {
             }
 
             #if os(macOS)
-            WorkspaceStatusStack(state: state)
+            if recordedInput == nil { WorkspaceStatusStack(state: state)
                 .id(input.scope)
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
             #else
             Divider()
             ScrollView {
@@ -517,6 +529,8 @@ public struct WorkspaceInspector: View {
     }
 }
 
+public enum WorkspaceInspectorPane: Sendable { case files, terminal }
+
 private enum InspectorTab: Hashable { case files, sources, terminal }
 
 struct InspectorScope: Hashable {
@@ -531,6 +545,16 @@ struct InspectorInput: Equatable {
     let messages: [ChatMessage]
     let attachments: [AttachmentItem]
     let isLimited: Bool
+
+    /// Results expose the same recorded-tool evidence without pretending a
+    /// historical run is an attached conversation or reading the local disk.
+    init(messages: [ChatMessage], scope: InspectorScope? = nil) {
+        self.scope = scope
+        let relevant = messages.filter { $0.role == .tool }
+        self.messages = Array(relevant.suffix(500))
+        attachments = []
+        isLimited = relevant.count > 500
+    }
 
     init(state: ConversationState?, attachments: [AttachmentItem]) {
         scope = state.map { InspectorScope(owner: $0.owner, storedID: $0.storedID, cwd: $0.cwd) }

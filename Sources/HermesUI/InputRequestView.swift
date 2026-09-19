@@ -48,7 +48,9 @@ public struct InputRequestView: View {
                 Text(title).foregroundStyle(.primary)
             } icon: {
                 Image(systemName: input.method == "clarify" ? "questionmark.bubble" : "lock.shield")
-                    .foregroundStyle(TalariaStyle.accent)
+                    .foregroundStyle(TalariaStyle.attention)
+                    .frame(width: 26, height: 26)
+                    .background(TalariaStyle.attentionTint, in: RoundedRectangle(cornerRadius: 8))
             }
             .font(TalariaTypography.headline)
             switch input.method {
@@ -68,10 +70,11 @@ public struct InputRequestView: View {
                 }
             }
         }
-        .padding(18)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.quaternary, lineWidth: 1))
+        .background(TalariaStyle.cardSurface.opacity(0.8), in: RoundedRectangle(cornerRadius: requestRadius))
+        .overlay(RoundedRectangle(cornerRadius: requestRadius).stroke(TalariaStyle.cardBorder, lineWidth: 1))
+        .shadow(color: .black.opacity(0.10), radius: 10, y: 6)
     }
 
     #if os(iOS)
@@ -80,9 +83,9 @@ public struct InputRequestView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "lock.shield")
                     .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(TalariaStyle.accent)
+                    .foregroundStyle(TalariaStyle.attention)
                     .frame(width: 34, height: 34)
-                    .background(TalariaStyle.accentTint, in: RoundedRectangle(cornerRadius: 11))
+                    .background(TalariaStyle.attentionTint, in: RoundedRectangle(cornerRadius: 11))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(nonempty("description") ?? "Permission requested")
@@ -130,32 +133,8 @@ public struct InputRequestView: View {
     }
 
     private var mobileApprovalActions: some View {
-        VStack(spacing: 4) {
-            let mainChoices = approvalChoices.filter { $0 != "session" }
-            if !mainChoices.isEmpty {
-                // Keep the two primary choices alongside each other when their
-                // natural Dynamic Type widths fit; otherwise give each a row.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 8) {
-                        ForEach(mainChoices, id: \.self) { choice in
-                            mobileApprovalButton(choice).frame(minWidth: approvalButtonWidth)
-                        }
-                    }
-                    VStack(spacing: 8) {
-                        ForEach(mainChoices, id: \.self) { choice in mobileApprovalButton(choice) }
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            if approvalChoices.contains("session") {
-                mobileApprovalButton("session")
-            }
-            Button(role: .cancel) { answer(.object(["choice": .string("deny")])) } label: {
-                Text("Deny").iosFont(14).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
+        VStack(spacing: 8) {
+            ForEach(approvalChoices, id: \.self) { choice in mobileApprovalButton(choice) }
         }
     }
 
@@ -166,7 +145,7 @@ public struct InputRequestView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
         }
-        if choice == "once" {
+        if choice == approvalChoices.first && choice != "deny" {
             button.talariaProminentButton().frame(maxWidth: .infinity, minHeight: 44)
         } else {
             button.talariaSecondaryButton().frame(maxWidth: .infinity, minHeight: 44)
@@ -188,18 +167,7 @@ public struct InputRequestView: View {
     }
 
     private var approvalChoices: [String] {
-        let supplied = input.params["choices"]?.arrayValue?.compactMap(\.stringValue)
-        let allowed: [String]
-        if let supplied, !supplied.isEmpty { allowed = supplied }
-        else { allowed = ["once", "session", "always", "deny"] }
-        let smartDenied = input.params["smart_denied"]?.boolValue == true
-        return ["once", "session", "always"].filter { choice in
-            guard allowed.contains(choice) else { return false }
-            if choice == "session" || choice == "always" {
-                guard !smartDenied, input.params["allow_session"]?.boolValue != false else { return false }
-            }
-            return choice != "always" || input.params["allow_permanent"]?.boolValue != false
-        }
+        RequestApprovalChoices.allowed(in: input.params)
     }
 
     private var approvalBody: some View {
@@ -218,21 +186,26 @@ public struct InputRequestView: View {
     }
 
     @ViewBuilder private var approvalButtons: some View {
-        Button("Deny", role: .cancel) { answer(.object(["choice": .string("deny")])) }
-            .talariaSecondaryButton()
         ForEach(approvalChoices, id: \.self) { choice in
             Button(approvalLabel(choice)) { answer(.object(["choice": .string(choice)])) }
+                #if os(macOS)
+                .buttonStyle(RequestChoiceStyle(prominent: choice == approvalChoices.first && choice != "deny"))
+                #else
                 .talariaSecondaryButton()
+                #endif
         }
     }
 
     private func approvalLabel(_ choice: String) -> String {
-        switch choice {
-        case "once": "Allow once"
-        case "session": "Allow for this session"
-        case "always": "Always allow"
-        default: choice
-        }
+        choice
+    }
+
+    private var requestRadius: CGFloat {
+        #if os(macOS)
+        12
+        #else
+        22
+        #endif
     }
 
     @ViewBuilder private var command: some View {
@@ -488,5 +461,45 @@ public struct InputRequestView: View {
         clearValues()
         submissionID = nil
         submitting = false
+    }
+}
+
+/// Preserve the host's option order and labels, while respecting narrower scope
+/// flags. Missing choices never invent a persistent permission grant.
+enum RequestApprovalChoices {
+    static func allowed(in params: JSONValue) -> [String] {
+        let supplied = params["choices"]?.arrayValue?.compactMap(\.stringValue) ?? ["once", "deny"]
+        var seen = Set<String>()
+        return supplied.filter { choice in
+            guard ["once", "session", "always", "deny"].contains(choice), seen.insert(choice).inserted else { return false }
+            if ["session", "always"].contains(choice),
+               params["smart_denied"]?.boolValue == true || params["allow_session"]?.boolValue == false { return false }
+            return choice != "always" || params["allow_permanent"]?.boolValue != false
+        }
+    }
+}
+
+#if os(macOS)
+private struct RequestChoiceStyle: ButtonStyle {
+    let prominent: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(T.f(11, .medium)).foregroundStyle(prominent ? .white : T.deep)
+            .padding(.horizontal, 12).frame(height: 28)
+            .background(prominent ? T.fill : T.card, in: Capsule())
+            .overlay(Capsule().stroke(T.glassHi)).opacity(configuration.isPressed ? 0.8 : 1)
+    }
+}
+#endif
+struct RequestReceiptView: View {
+    let receipt: RequestReceipt
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark").foregroundStyle(TalariaStyle.accent)
+            Text(receipt.summary)
+            Spacer(minLength: 0)
+            Text(receipt.createdAt, style: .time)
+        }.hierarchyFont(H.mobile ? 13 : 11).foregroundStyle(.secondary)
+            .padding(.horizontal, 12).padding(.vertical, H.mobile ? 12 : 8)
+            .hierarchyCard(opacity: 0.45, radius: H.mobile ? 14 : 8)
     }
 }

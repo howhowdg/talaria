@@ -5,11 +5,13 @@ public struct SessionSettingsViewState: Equatable, Sendable {
     public let snapshot: GatewaySettingsSnapshot?
     public let profile: String
     public let sessionID: String?
+    public let workingDirectory: String?
     public let isLoading: Bool
     public let isApplying: Bool
     public let errorMessage: String?
     public init(snapshot: GatewaySettingsSnapshot? = nil, profile: String, sessionID: String? = nil,
-                isLoading: Bool = false, isApplying: Bool = false, errorMessage: String? = nil) {
+                isLoading: Bool = false, isApplying: Bool = false, errorMessage: String? = nil, workingDirectory: String? = nil) {
+        self.workingDirectory = workingDirectory
         self.snapshot = snapshot; self.profile = profile; self.sessionID = sessionID
         self.isLoading = isLoading; self.isApplying = isApplying; self.errorMessage = errorMessage
     }
@@ -31,6 +33,7 @@ public struct SessionSettingsView: View {
     @State private var operationInFlight = false
     @State private var notice: String?
     @State private var confirmation: Confirmation?
+    @State private var browsingModels = false
 
     public init(state: SessionSettingsViewState,
                 onRefresh: @escaping @MainActor () async -> Void,
@@ -41,6 +44,10 @@ public struct SessionSettingsView: View {
     }
 
     public var body: some View {
+        Group {
+            #if os(macOS)
+            macSettings
+            #else
         NavigationStack {
             Form {
                 if state.isLoading { ProgressView("Loading settings…") }
@@ -71,9 +78,8 @@ public struct SessionSettingsView: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 480, idealWidth: 560, minHeight: 520, idealHeight: 650)
-        #endif
+            #endif
+        }
         .onAppear { seed() }
         .onChange(of: state.snapshot) { _, _ in seed() }
         .onChange(of: state.sessionID) { _, _ in confirmation = nil; notice = nil; seed() }
@@ -89,6 +95,106 @@ public struct SessionSettingsView: View {
             }
         } message: { Text($0.message) }
     }
+
+    #if os(macOS)
+    private var macSettings: some View {
+        SettingsSheet("Conversation settings", content: {
+            if state.isLoading { ProgressView("Loading settings…").font(T.f(12)) }
+            if let error = state.errorMessage { Text(error).font(T.f(11.5)).foregroundStyle(T.failed) }
+            if let notice { Text(notice).font(T.f(11.5)).foregroundStyle(T.ink2) }
+            if let snapshot = state.snapshot {
+                SettingsSection("Model", footer: state.sessionID == nil
+                    ? "Open a conversation to choose its model. Changes apply to that conversation only."
+                    : "Pick a listed model or type a model ID this provider accepts. Changes apply to this conversation only — finish or stop the current run first.") {
+                    SettingsRow("Provider") {
+                        Picker("Provider", selection: Binding(get: { provider }, set: { newValue in
+                            provider = newValue
+                            if let row = snapshot.models.providers.first(where: { $0.slug == newValue }) {
+                                model = row.matches(snapshot.models.provider) ? snapshot.models.model
+                                    : row.models.first(where: { !row.unavailableModels.contains($0) }) ?? ""
+                            }
+                            reasoning = ""
+                        })) {
+                            if provider.isEmpty { Text("Choose a provider").tag("") }
+                            ForEach(snapshot.models.providers) { Text($0.name).tag($0.slug) }
+                        }.pickerStyle(.menu).controlSize(.small)
+                    }
+                    SettingsRow("Model") {
+                        ValueField(text: $model, action: ("Browse", "list.bullet", { browsingModels = true }))
+                            .frame(maxWidth: 280)
+                            .popover(isPresented: $browsingModels) {
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        ForEach(selectedProvider?.models ?? [], id: \.self) { item in
+                                            Button(item) { model = item; reasoning = ""; browsingModels = false }
+                                                .buttonStyle(.plain).font(T.f(12.5)).padding(.vertical, 4)
+                                                .disabled(selectedProvider?.unavailableModels.contains(item) == true)
+                                        }
+                                    }.padding(14)
+                                }.frame(width: 320, height: 300)
+                            }
+                    }
+                    if let capabilities = selectedProvider?.capabilities[model], capabilities.reasoning {
+                        SettingsRow("Reasoning") {
+                            Picker("Reasoning", selection: $reasoning) {
+                                Text("Model default").tag("")
+                                ForEach(GatewayReasoningEffort.allCases.filter(capabilities.supports)) { Text($0.label).tag($0.rawValue) }
+                            }.pickerStyle(.menu).controlSize(.small)
+                        }
+                    }
+                }.disabled(busy || state.sessionID == nil || profile != state.profile)
+                SettingsSection("Hermes profile", footer: "Switching changes the profile used by this connection. Your other conversations keep their own profiles.") {
+                    SettingsRow("Profile") {
+                        Picker("Profile", selection: $profile) {
+                            if !snapshot.profiles.contains(where: { $0.name == state.profile }) { Text(state.profile).tag(state.profile) }
+                            ForEach(snapshot.profiles) { Text($0.label).tag($0.name) }
+                        }.pickerStyle(.menu).controlSize(.small)
+                    }
+                    if let cwd = state.workingDirectory, !cwd.isEmpty {
+                        SettingsRow("Working directory", tall: true) {
+                            Text(cwd).font(.system(size: 12.5, design: .monospaced)).foregroundStyle(T.ink2)
+                                .lineLimit(2).truncationMode(.middle).textSelection(.enabled)
+                        }
+                    }
+                }.disabled(busy)
+                if let warning = selectedProvider?.warning { Text(warning).font(T.f(11.5)).foregroundStyle(T.ink2) }
+                ForEach(snapshot.notices, id: \.self) { Text($0).font(T.f(11.5)).foregroundStyle(T.ink2) }
+            } else if !state.isLoading {
+                Text("Refresh to read settings from the connected Hermes host.").font(T.f(12)).foregroundStyle(T.ink2)
+            }
+        }, footer: {
+            Button { Task { await refresh() } } label: { Label("Refresh models", systemImage: "arrow.clockwise") }
+                .buttonStyle(.plain).foregroundStyle(T.ink2).disabled(busy)
+            Spacer()
+            Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+            Button("Apply") { Task { await applySettings() } }
+                .buttonStyle(.borderedProminent).tint(T.fill).keyboardShortcut(.defaultAction).disabled(!canApply)
+        }).frame(height: 450)
+    }
+    private var canApply: Bool {
+        guard !busy, let snapshot = state.snapshot else { return false }
+        if profile != state.profile { return snapshot.profiles.contains { $0.name == profile } }
+        guard state.sessionID != nil, let selectedProvider, selectedProvider.isAvailable,
+              !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !selectedProvider.unavailableModels.contains(model) else { return false }
+        return provider != snapshot.models.currentProvider?.slug || model != snapshot.models.model
+            || reasoning != (snapshot.reasoningEffort ?? "")
+    }
+    private func applySettings() async {
+        guard canApply else { return }
+        if profile != state.profile {
+            operationInFlight = true
+            let selected = profile
+            let changed = await onSelectProfile(selected)
+            operationInFlight = false
+            if changed { dismiss() }
+        } else {
+            let effort = GatewayReasoningEffort(rawValue: reasoning)
+            let supported = effort.flatMap { selectedProvider?.capabilities[model]?.supports($0) == true ? $0 : nil }
+            await apply(GatewayModelSelection(provider: provider, model: model.trimmingCharacters(in: .whitespacesAndNewlines), reasoningEffort: supported), confirmed: false)
+        }
+    }
+    #endif
 
     @ViewBuilder private func modelSection(_ snapshot: GatewaySettingsSnapshot) -> some View {
         Section {

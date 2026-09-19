@@ -15,7 +15,7 @@ public struct MobileSchedule: Identifiable, Equatable, Sendable {
     init?(json: JSONValue) {
         guard let id = activityID(json["id"] ?? json["job_id"]) else { return nil }
         self.id = id
-        name = activityText(json["name"], fallback: "Scheduled task", limit: 200)
+        name = activityText(json["name"], fallback: "Automation", limit: 200)
         promptPreview = activityText(json["prompt_preview"] ?? json["prompt"], limit: 500)
         if let text = json["schedule"]?.stringValue { schedule = String(text.prefix(200)) }
         else { schedule = activityText(json["schedule_display"] ?? json["schedule"]?["display"], limit: 200) }
@@ -35,6 +35,10 @@ public struct MobileRun: Identifiable, Equatable, Sendable {
     public var summary: String
     public let startedAt: Date?
     public let isActive: Bool
+    public let endedAt: Date?
+    public let endReason: String?
+    public var status: AutomationRunStatus
+    public var automationID: String { scheduleID }
 
     init?(json: JSONValue, schedule: MobileSchedule, profile: String) {
         guard let id = activityID(json["id"]),
@@ -44,6 +48,11 @@ public struct MobileRun: Identifiable, Equatable, Sendable {
         summary = ""
         startedAt = activityDate(json["started_at"])
         isActive = json["is_active"]?.boolValue ?? false
+        endedAt = activityDate(json["ended_at"])
+        endReason = json["end_reason"]?.stringValue
+        status = isActive ? .working : endReason == "cron_complete" ? .completed : .unavailable
+        if ["error", "failed", "cron_failed"].contains(endReason ?? "") { status = .failed }
+        if endReason == "cron_incomplete_no_output" { status = .noOutput }
     }
 }
 
@@ -133,13 +142,13 @@ public struct MobileActivityService: Sendable {
             snapshot.schedules = rows.filter { $0["profile"]?.stringValue.map({ $0 == profile }) != false }
                 .compactMap(MobileSchedule.init).filter { seen.insert($0.id).inserted }
             if snapshot.schedules.count > Self.maximumSchedules {
-                snapshot.notices.append("Showing recent runs for the first \(Self.maximumSchedules) schedules.")
+                snapshot.notices.append("Showing recent runs for the first \(Self.maximumSchedules) automations.")
             }
             snapshot.schedules = Array(snapshot.schedules.prefix(200))
             succeeded += 1
         } catch {
             try Task.checkCancellation()
-            snapshot.notices.append("Schedules could not be loaded. Pull to refresh.")
+            snapshot.notices.append("Automations could not be loaded. Pull to refresh.")
         }
         try Task.checkCancellation()
         do {
@@ -178,8 +187,8 @@ public struct MobileActivityService: Sendable {
                 snapshot.runs += rows.prefix(5).compactMap { MobileRun(json: $0, schedule: schedule, profile: profile) }
             } catch {
                 try Task.checkCancellation()
-                if !snapshot.notices.contains("Some scheduled runs could not be loaded.") {
-                    snapshot.notices.append("Some scheduled runs could not be loaded.")
+                if !snapshot.notices.contains("Some automation runs could not be loaded.") {
+                    snapshot.notices.append("Some automation runs could not be loaded.")
                 }
             }
         }
@@ -194,19 +203,14 @@ public struct MobileActivityService: Sendable {
                 let result = try await read(.sessionMessages(id: snapshot.runs[index].sessionID.rawValue, limit: 20))
                 guard result["profile"]?.stringValue.map({ $0 == profile }) != false,
                       result["session_id"]?.stringValue.map({ $0 == snapshot.runs[index].sessionID.rawValue }) != false,
-                      let rows = result["messages"]?.arrayValue else { throw MobileActivityError.invalidResponse }
-                // List previews are the FIRST USER prompt. They must not be
-                // presented as the scheduled run's outcome.
-                if let last = rows.suffix(40).last(where: {
-                    $0["role"]?.stringValue == "assistant" && $0["display_kind"]?.stringValue != "hidden"
-                        && !activityDisplayText($0).isEmpty
-                }) {
-                    snapshot.runs[index].summary = String(activityDisplayText(last).prefix(1_200))
-                }
+                      result["messages"]?.arrayValue != nil else { throw MobileActivityError.invalidResponse }
+                let detail = AutomationRunResult.parse(snapshot.runs[index], response: result)
+                snapshot.runs[index].summary = String(detail.result.prefix(1_200))
+                snapshot.runs[index].status = detail.status
             } catch {
                 try Task.checkCancellation()
-                if !snapshot.notices.contains("Some run summaries are unavailable; open the conversation to read its history.") {
-                    snapshot.notices.append("Some run summaries are unavailable; open the conversation to read its history.")
+                if !snapshot.notices.contains("Some run results are unavailable; open the run to retry.") {
+                    snapshot.notices.append("Some run results are unavailable; open the run to retry.")
                 }
             }
         }
