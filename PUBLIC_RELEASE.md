@@ -14,7 +14,9 @@ Publish the existing native client as a development preview. Keep the [implement
 
 The public source includes the Swift packages, app targets, generated Xcode project, pinned contract, tests, isolated integration fixtures, original logo, native icon and documentation. The downloaded upstream checkout, local runtime state, provider credentials, signing material and build products stay outside version control.
 
-GitHub Releases now includes an ad hoc signed universal Mac preview for Apple silicon and Intel. It is not Developer ID signed or notarized, and macOS may block opening a downloaded copy. A production Mac distribution still needs signing and notarization; an iOS TestFlight/App Store release needs Apple signing and distribution setup.
+The v0.1.2 Mac preview is a universal Apple silicon/Intel application with Developer ID signing, Apple notarization and a stapled ticket. The final ZIP is verified after extraction, including Gatekeeper acceptance, and published with its SHA-256 checksum. It requires macOS 14 or later and an existing Hermes host. The earlier v0.1.1 download remains a historical ad hoc preview.
+
+The [repeatable Mac distribution process](research/MAC_DISTRIBUTION.md) requires signing, notarization, a stapled ticket and Gatekeeper verification before producing public output. Both the package script and Xcode Organizer workflow keep credentials outside the repository. Mac distribution is direct through GitHub Releases and the landing page, with no App Store submission. An installable iOS release needs a separate distribution plan; no iOS binary is published.
 
 ## Evidence and remaining release work
 
@@ -25,7 +27,7 @@ GitHub Releases now includes an ad hoc signed universal Mac preview for Apple si
 - Publication-content review found no actual credentials, private keys, private conversation data, personal paths or signing identities in the source/assets reviewed. Synthetic fixture credentials remain clearly labeled as test data.
 - Both apps rebuild successfully after aligning the scheme product names and bundling the exact Hermes third-party notice. Contract drift and credential/signing ignore-rule checks pass.
 - The optional integration fixture now documents a pinned source checkout and dedicated Python environment. The fresh Python installation recipe still needs verification; existing integration passes used an already provisioned dependency environment.
-- The initial publication was source only. The 0.1.1 Mac preview adds a universal download; the release is ad hoc signed and not notarized.
+- The initial publication was source only, followed by the ad hoc v0.1.1 preview. Version 0.1.2 adds a notarized universal Mac download. Its source passes 219 Swift tests, 35 Python unit tests and contract verification; six optional Hermes ASGI tests require a provisioned upstream environment and were skipped locally. The signed archive contains no debug-fixture controls or local build-path markers; a content scan found no credentials or private gateway configuration.
 - Configure CI against an available Xcode 27 runner. Do not add a passing-status badge before that workflow actually runs.
 
 This source release does not claim full Hermes Desktop parity or completed security testing.

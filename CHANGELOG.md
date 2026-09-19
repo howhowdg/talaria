@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 — 2026-09-18
+
+- Home, Workspaces, Automations and Activity organise conversations and scheduled results on Mac and iOS.
+- Mac transcripts use compact, side-by-side bubbles with assistant avatars, separate tool and request cards, and gateway-provided timestamps.
+- Import Telegram topics through the optional Hermes integration; retain verified names while preserving custom workspace names.
+- Updated native icons, settings surfaces, request handling and gateway compatibility.
+- Add a repeatable Mac distribution packager that requires Developer ID signing, notarization and Gatekeeper verification before producing a public download. The universal Mac preview includes a stapled notarization ticket and a published SHA-256 checksum.
+
 ## 0.1.1 — 2026-09-17
 
 Mac workspace preview.

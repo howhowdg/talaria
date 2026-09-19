@@ -36,7 +36,7 @@ xcodebuild -project Talaria.xcodeproj -scheme TalariaMac \
   'ARCHS=arm64 x86_64' ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- build
 ```
 
-Archive `/tmp/talaria-mac-release/Build/Products/Release/Talaria.app` with `ditto -c -k --keepParent` and publish its SHA-256 checksum with the download. This produces the ad hoc signed preview, not a notarized distribution.
+This builds an ad hoc signed app for local testing. For a public download, follow the [Mac distribution process](research/MAC_DISTRIBUTION.md): the packager strips local build paths, signs with Developer ID, notarizes and staples the app, and verifies Gatekeeper before producing the archive and checksum. Keep signing identities and notarization credentials in local arguments/Keychain, outside the repository.
 
 ## Change the project
 
