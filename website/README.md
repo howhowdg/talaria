@@ -38,7 +38,9 @@ npm run build
 
 ## Hosting
 
-The repository's `Publish Talaria website` GitHub Actions workflow validates pull requests and publishes `website/dist/` from `main`. It only runs automatically when public website files, the validator, or the workflow change. Native-only changes do not trigger website deployment. Enable GitHub Pages with **GitHub Actions** as the publishing source. The first deployment uses the project's GitHub Pages address until a registered custom domain is connected.
+The website's custom domain is [usetalaria.com](https://usetalaria.com/). The repository's `Publish Talaria website` GitHub Actions workflow validates pull requests and publishes `website/dist/` from `main`. It only runs automatically when public website files, the validator, or the workflow change. Native-only changes do not trigger website deployment. GitHub Pages uses **GitHub Actions** as the publishing source, with `usetalaria.com` configured as the custom domain in the repository's Pages settings.
+
+Porkbun manages the domain's DNS: apex A and AAAA records point to GitHub Pages, and `www` is a CNAME to `howhowdg.github.io`. Publishing through GitHub Actions does not require a `CNAME` file in `dist/`; the custom domain is managed in Pages settings. The page's canonical URL and social metadata use `https://usetalaria.com/`.
 
 The deployment artifact excludes website documentation, QA captures, scripts and all native-app source. GitHub Releases continues to host the Mac download.
 
@@ -48,4 +50,4 @@ The original composition, gradients, typography, winged-sandal artwork, Mac/iPho
 
 Repository links resolve to `https://github.com/howhowdg/talaria`. All three Mac download buttons link directly to the user-supplied **v0.1.2 universal Mac ZIP**: `https://github.com/howhowdg/talaria/releases/download/v0.1.2/Talaria-0.1.2-macOS-universal.zip`. The displayed version is v0.1.2 preview. The page retains macOS 14+ and iPhone-in-development copy; no TestFlight date is promised.
 
-The supplied product screenshots are design mockups and the copy describes the intended product experience. This implementation does not verify native feature availability. Keep screenshots and feature claims aligned with the shipping native build, refresh release links/version, and set absolute social metadata when the custom domain is connected.
+The supplied product screenshots are design mockups and the copy describes the intended product experience. This implementation does not verify native feature availability. Keep screenshots and feature claims aligned with the shipping native build, and refresh release links/version as new builds ship.
