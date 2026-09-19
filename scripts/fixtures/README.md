@@ -1,7 +1,7 @@
 # Real gateway smoke fixtures
 
 Run these commands from the Talaria repository root in the same shell. The native
-client requires the development tools listed in the [main README](../../README.md).
+client requires the development tools listed in [Contributing](../../CONTRIBUTING.md).
 The integration fixture additionally needs Git, `python3`, and
 [uv](https://docs.astral.sh/uv/getting-started/installation/) on `PATH`.
 No Hermes account or provider API key is needed.

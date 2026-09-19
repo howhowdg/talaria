@@ -32,3 +32,9 @@ talaria-telegram-topic-name-evidence.json
 *.ipa
 *.dmg
 *.log
+
+# Local planning, agent state and archived working material
+.local/
+.codex/
+.agents/
+.gstack/

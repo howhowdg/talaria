@@ -1,53 +1,30 @@
-# Talaria landing page
+# Talaria website
 
-Standalone static web app adapted from the supplied `Downloads/landing/dist/` design. All website work is contained in this directory; no native app source changes are required.
+Static landing page for [usetalaria.com](https://usetalaria.com/). The public files live in `dist/`; there are no package dependencies or compilation step.
 
 ## Preview
 
-Requires Python 3. npm is optional and only provides convenient command aliases; there are no packages to install.
-
-```sh
-cd website
-npm run dev
-```
-
-Open <http://127.0.0.1:4173/>. The server serves only `dist/` and binds to loopback. Stop it with Ctrl-C.
-
-Without npm:
+Requires Python 3. From this directory:
 
 ```sh
 python3 -m http.server 4173 --bind 127.0.0.1 --directory dist
 ```
 
-## Validate
+Open <http://127.0.0.1:4173/>. `npm run dev` runs the same command.
+
+## Check changes
 
 ```sh
-npm run build
-# Equivalent: python3 scripts/check.py
+python3 scripts/check.py
+# Or: npm run build
 ```
 
-`dist/` is the authored, ready-to-serve output. There is no transpilation or installation step. The build command validates HTML nesting, landmarks, image dimensions, all local asset references, internal links, and unresolved repository placeholders. Browser verification is documented in `qa/REPORT.md`.
+The check validates HTML structure, landmarks, image dimensions, local assets and internal links. For layout changes, also check desktop and narrow mobile widths, keyboard navigation and enlarged text in a browser.
 
-## Files
+## Publish
 
-- `dist/index.html`: semantic page structure, original marketing copy, links and metadata.
-- `dist/styles.css`: supplied visual design with responsive and accessibility refinements.
-- `dist/assets/`: all six original assets, unmodified.
-- `DESIGN_REFERENCE.md`: the original design handoff notes.
-- `qa/`: inspected screenshots and validation evidence.
+The `Publish Talaria website` GitHub Actions workflow validates website pull requests and publishes only `website/dist/` from `main`. It runs when public website files, the validator or the workflow change. GitHub Releases hosts the Mac download.
 
-## Hosting
+GitHub Pages uses `usetalaria.com` as its custom domain. Porkbun DNS points the apex A and AAAA records to GitHub Pages, with `www` as a CNAME to `howhowdg.github.io`. Actions publishing uses the domain configured in Pages settings and does not require a `CNAME` file.
 
-The website's custom domain is [usetalaria.com](https://usetalaria.com/). The repository's `Publish Talaria website` GitHub Actions workflow validates pull requests and publishes `website/dist/` from `main`. It only runs automatically when public website files, the validator, or the workflow change. Native-only changes do not trigger website deployment. GitHub Pages uses **GitHub Actions** as the publishing source, with `usetalaria.com` configured as the custom domain in the repository's Pages settings.
-
-Porkbun manages the domain's DNS: apex A and AAAA records point to GitHub Pages, and `www` is a CNAME to `howhowdg.github.io`. Publishing through GitHub Actions does not require a `CNAME` file in `dist/`; the custom domain is managed in Pages settings. The page's canonical URL and social metadata use `https://usetalaria.com/`.
-
-The deployment artifact excludes website documentation, QA captures, scripts and all native-app source. GitHub Releases continues to host the Mac download.
-
-## Design and release decisions
-
-The original composition, gradients, typography, winged-sandal artwork, Mac/iPhone mockups, sections and marketing copy are preserved. Responsive changes prevent narrow-screen clipping, preserve phone image proportions and stack actions at small widths. Semantic landmarks, a skip link, visible keyboard focus, 44px touch targets and stronger text/button contrast improve access.
-
-Repository links resolve to `https://github.com/howhowdg/talaria`. All three Mac download buttons link directly to the user-supplied **v0.1.2 universal Mac ZIP**: `https://github.com/howhowdg/talaria/releases/download/v0.1.2/Talaria-0.1.2-macOS-universal.zip`. The displayed version is v0.1.2 preview. The page retains macOS 14+ and iPhone-in-development copy; no TestFlight date is promised.
-
-The supplied product screenshots are design mockups and the copy describes the intended product experience. This implementation does not verify native feature availability. Keep screenshots and feature claims aligned with the shipping native build, and refresh release links/version as new builds ship.
+Keep the three download links and displayed version aligned with the current release. Canonical and social-image URLs use `https://usetalaria.com/`. The supplied product images are design previews; update them as the native interface evolves.

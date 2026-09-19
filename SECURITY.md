@@ -12,4 +12,4 @@ Talaria stores remembered gateway tokens in the system Keychain; provider creden
 
 Use one active native sending client per session during this preview. Complete replay-gap recovery, multi-client request settlement and attachment leases are still on the roadmap. The app does not automatically resend a prompt whose delivery is uncertain.
 
-The bundled integration fixture uses synthetic inference and disposable credentials. Its loopback network guard is a Python test aid, not an operating-system sandbox. See [implementation status](IMPLEMENTATION_STATUS.md) for verified behavior and remaining limitations.
+The bundled integration fixture uses synthetic inference and disposable credentials. Its loopback network guard is a Python test aid, not an operating-system sandbox. See [preview status](docs/status.md) for current capabilities and limitations.
