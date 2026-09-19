@@ -1,5 +1,9 @@
 # Website changes
 
+## 2026-09-18 — Custom domain
+
+- Connect `usetalaria.com` to GitHub Pages and use the domain for canonical and social metadata.
+
 ## 1.0.0 — 2026-09-18
 
 - Add the Talaria landing page using the supplied artwork, product mockups and copy.

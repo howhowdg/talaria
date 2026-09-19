@@ -1,4 +1,4 @@
-# Local landing-page verification
+# Landing-page verification
 
 Checked September 18, 2026 using the isolated gstack Chromium browser and Python static checks.
 
@@ -12,7 +12,7 @@ Checked September 18, 2026 using the isolated gstack Chromium browser and Python
 - Phone screenshots preserve their source aspect ratio. Bottom CTA retains a distinct white-button hover treatment.
 - GitHub API confirms the public repository, enabled issues, main-branch MIT license, and v0.1.1 prerelease with a universal Mac ZIP. This was the initial release-link check; download targets were subsequently updated as noted below. No ZIP was downloaded or executed.
 - Independent source audit confirms all original marketing copy is preserved, aside from the intentional release line, and every supplied asset is byte-for-byte unchanged (SHA-256 comparison).
-- Only `website/` is changed in this worktree. No public deployment or native app changes.
+- At this initial local verification stage, only `website/` was changed and the site had not been deployed. No native app changes were made.
 
 ## Screenshots
 
@@ -27,3 +27,11 @@ Screenshots were inspected after image decoding. These checks cover this static 
 ## Download-link update
 
 All three Mac download CTAs now use the user-supplied direct v0.1.2 universal ZIP URL, and the visible version is v0.1.2 preview. The saved screenshots document the initial v0.1.1 layout.
+
+## Public deployment and custom domain
+
+- PR #3 published the website through GitHub Pages. Deployment run `35418941095` succeeded, and the public page was checked in the browser with the v0.1.2 download and project GitHub links.
+- `usetalaria.com` is registered in the owner's Porkbun account and configured as the repository's Pages custom domain.
+- Public DNS resolves the apex to GitHub's four IPv4 and four IPv6 addresses. `www.usetalaria.com` resolves to `howhowdg.github.io`.
+- GitHub's Pages health check reports both domains valid, served by Pages, and eligible for HTTPS. The apex returns HTTP 200. HTTPS certificate provisioning is pending at this checkpoint.
+- Canonical and Open Graph URLs use `https://usetalaria.com/`; the social image uses an absolute URL on that domain. Static validation and `git diff --check` pass.
