@@ -1,13 +1,28 @@
 # Handoff: Talaria — Mac + iPhone redesign
 
-## Overview
-A native SwiftUI redesign of Talaria (the independent Hermes Agent client in howhowdg/talaria). Mac: three-column window — glass sidebar (sessions), chat, glass inspector (Files / Sources / Terminal + status stack). iPhone: content scrolls edge-to-edge under floating Liquid Glass controls. New brand: blue palette, a dotted-line winged-sandal mark, "Talaria" wordmark in New York.
+## Current handoff — Home / Workspaces / Automations
 
-## Latest Mac implementation spec
+Read [hierarchy/README.md](hierarchy/README.md) first. The current hierarchy uses **Home**, **Workspace**, **Delegated task**, **Automation**, **Run**, **Activity** and **Needs you** exactly as defined there. A Workspace is durable; a Delegated task is temporary work with an explicit lifecycle; an Automation owns Runs. The design's sample records do not establish real relationships.
 
-[SWIFTUI_SPEC_MAC.md](SWIFTUI_SPEC_MAC.md), refined by [SWIFTUI_FIXES_ROUND3.md](SWIFTUI_FIXES_ROUND3.md), takes precedence over the original guidance below. It requires fixed point typography, a plain HStack with 240/290pt side columns, custom 28pt search, and the explicit FloatingGlass/ControlGlass/ProminentCapsule treatments. The earlier semantic-font spec is preserved as [SWIFTUI_SPEC_MAC-v1.md](SWIFTUI_SPEC_MAC-v1.md). iPhone guidance remains unchanged.
+### Precedence
 
-Latest visual feedback supersedes the point sizes above: the Mac workspace uses a 1pt smaller text scale (12.5pt body, 12pt rows, 11pt inspector/tool text, 10pt section labels, 15pt wordmark). The header removes the extra 14pt leading inset and uses the standalone pencil from screen 4a. Control dimensions and iPhone typography remain unchanged.
+1. [hierarchy/SPEC_MAC.md](hierarchy/SPEC_MAC.md) and [hierarchy/SPEC_IOS.md](hierarchy/SPEC_IOS.md) supersede earlier sidebar, tab-bar and typography instructions where stated. Mac navigation belongs to the sidebar; the Sidebar/Tabs preference is removed. iOS has Home / Workspaces / Automations / Activity tabs.
+2. [SWIFTUI_FIXES_ROUND3.md](SWIFTUI_FIXES_ROUND3.md), [SWIFTUI_FIXES_ROUND4.md](SWIFTUI_FIXES_ROUND4.md) and [SWIFTUI_SETTINGS_KIT.md](SWIFTUI_SETTINGS_KIT.md) still govern unaffected details. Preserve the 70pt traffic-light reservation, compact lockup, 30pt compose control and Settings Kit surfaces.
+3. [SWIFTUI_SPEC_MAC.md](SWIFTUI_SPEC_MAC.md) and the original material below are historical references wherever superseded. [SWIFTUI_SPEC_MAC-v1.md](SWIFTUI_SPEC_MAC-v1.md) is the earlier semantic-font version.
+
+The current Mac scale is 12.5pt body, 12pt sidebar rows, 10pt section labels, 11pt tool rows, 15pt New York wordmark and 26pt mark. iOS keeps its platform scale and Dynamic Type. Attention alone uses amber `#B8640A` / dark `#E8A24A`; links, active work and completed results remain blue.
+
+### Current implementation scope
+
+The implementation follows [A → B → gated C](hierarchy/IMPLEMENTATION_NOTES.md): result-first Automations/Runs, explicit Home and unavailable state, retained session source and Activity; then explicit local Workspace classification, recorded origin links, unread tracking and selective Discuss drafts. **Organisation is currently local-only; iCloud KVS is not implemented.** Source/title/recency never assign Home, create a Workspace or prove a Telegram topic binding.
+
+Backend-dependent topic bindings, delegated lifecycle/goal/progress, automation editing, reset/compression continuity and canonical provenance are not implemented; feature flags default off. An existing supported host request stays visible and retains its host permission options. Discuss prepares only chosen context in the destination's draft and requires a separate Send.
+
+Current references: [hierarchy/screens](hierarchy/screens) contains the supplied 2× PNGs. Current native evidence and reproduction instructions live in [Design/verification/hierarchy](../verification/hierarchy/README.md). See [implementation status](../../IMPLEMENTATION_STATUS.md#current-hierarchy-implementation) for exact limits and test results. The hierarchy pass is source work and has not published a replacement Mac release.
+
+## Historical visual foundation
+
+The remainder preserves the original blue-brand handoff and its reference screen descriptions. Its Today/Yesterday/Folders sidebar, five phone tabs, Sources inspector tab, older point sizes and Sidebar/Tabs preference are **historical**, not the current navigation specification. The original assets and unaffected glass/composer treatments still apply through the precedence rules above.
 
 ## About the design files
 Everything in this bundle is a **design reference built in HTML** — it shows intended look and behaviour, it is not code to ship. Recreate it in the existing SwiftUI codebase (`Sources/HermesUI`), using the existing patterns: `TalariaStyle` modifiers (`talariaGlass`, `talariaProminentButton`, `talariaSecondaryButton`), `NavigationSplitView`, semantic system fonts, and `.glassEffect` on macOS/iOS 26+ with the existing material fallbacks.
@@ -15,15 +30,15 @@ Everything in this bundle is a **design reference built in HTML** — it shows i
 ## Fidelity
 **High-fidelity** for layout, colour, type, radii and hierarchy. Icons in the mocks are Unicode placeholders — use SF Symbols (suggested names below). Data is sample data.
 
-## iPhone implementation notes
+## Current iOS implementation notes
 
-The compact-width SwiftUI workspace implements the floating chrome, chat bubbles, Sessions, Updates, approval cards, installed Skills and recorded Files. Regular-width iPad keeps the existing split layout. Phone typography follows Dynamic Type; the latest compact Mac text scale does not apply to iPhone.
+The SwiftUI hierarchy shell uses four tabs and a navigation stack per tab. Skills and Settings are accessed from the profile menu; Files opens within its selected context. The shell also runs at regular width; the earlier iPad split interface is no longer the current claim, and a dedicated iPad redesign remains open.
 
-The reference below describes the intended design. Implemented controls use real host data and supported actions: Updates reads scheduled-run history, Skills lists installed skills, and Files shows recorded evidence. Approval buttons retain the host’s allowed permission scopes rather than inventing folder-specific grants. Drafting while approval is pending works; sending or queueing another prompt during a running turn, live steering, voice, schedule editing and background notifications remain unimplemented. The mock’s sample statuses, elapsed times and content are not substituted for unavailable data.
+Production views use actual host output and explicit local records. Home/Workspace assignment is never inferred. Run result text, unavailable output, request states and unread markers remain distinct. Existing once/session/always/deny controls retain the host's values and restrictions; no prototype-only folder grant, read-only execution claim or delegated progress is substituted. Live steering, new prompts during active turns, voice, automation creation/editing, skill management and push delivery remain future work.
 
-See the [native iPhone captures and verification limits](../../IMPLEMENTATION_STATUS.md#current-iphone-verification), plus the [repeatable Debug fixture](../../IMPLEMENTATION_STATUS.md#repeat-the-iphone-design-preview), for the implemented screens. Images under this handoff’s `screens/` directory remain the original design references.
+[Current native captures](../verification/hierarchy/README.md) are synthetic fixture renders, not HTML mockups or live-service proof. The older screenshots indexed below remain historical design references.
 
-## Where each screen lives
+## Historical screen index
 | Screen | File / anchor |
 | --- | --- |
 | Mac · chat workspace (the chosen direction) | `Talaria Mac.dc.html#4a` |
@@ -87,13 +102,13 @@ Common chrome: round glass buttons 48 at top-left (`line.3.horizontal` → sessi
 - `talaria-mark-{white,ink}-small.png` — optional 16pt cut.
 - Source drawing: `uploads/pasted-1789687970138-0.png` (front sandal cut out). The SVG is auto-traced from the Mid cut and slightly bolder than the PNG — intentional, it holds up at 16pt.
 
-## Suggested implementation order
+## Historical implementation order
 1. Swap `TalariaAssets.xcassets` colours and the wing mark for the new mark; set the wordmark font.
 2. Mac `HermesRootView`: add the inspector column (Files / Sources / Terminal + status), move the model picker into the composer, restyle sidebar rows and footer, add the Sidebar/Tabs preference.
 3. Tool card and status stack views (shared).
 4. iPhone: floating chrome (identity pill, round buttons, tab bar, composer), then Chat, Sessions, Updates, Approval card.
 
-## Screenshots (in /screens, 2×)
+## Historical screenshots (in /screens, 2×)
 - `mac-4a-chat-workspace.png` — Mac chat workspace, 1180×760 window
 - `mac-4b-brand-mark.png` — mark, wordmark lockup and size cuts
 - `ios-1a-chat.png`, `ios-1b-sessions.png`, `ios-1c-updates.png`, `ios-1d-approval.png` — iPhone screens, 402×874 frame

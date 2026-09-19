@@ -1,56 +1,40 @@
 # Talaria identity and native materials
 
-## Current in-app identity — handoff v2
+## Approved identity
 
-The [v2 handoff](../handoff/README.md), refined by the [native Mac correction spec](../handoff/SWIFTUI_SPEC_MAC.md), is the source of truth for the redesign. `TalariaMark.imageset` contains the supplied `talaria-mark.svg` unchanged, preserves its vector representation, and renders it as an accent-tinted template. The native wordmark uses New York semibold with the handoff’s optical spacing. The blue palette replaces the original green in the application interface.
+The [design handoff](../handoff/README.md), its [brand reference](../handoff/screens/mac-4b-brand-mark.png), and the [hierarchy specifications](../handoff/hierarchy/README.md) define the current identity: a winged sandal, blue accents, and a New York semibold wordmark.
 
-| Use | Color |
-| --- | --- |
-| Prominent buttons and running indicators | `#3B7DDD` |
-| Light appearance links, mark and small labels | `#1F5FB8` |
-| Dark appearance links, mark and small labels | `#7FB0F0` |
+Both the Mac and iOS launcher icons now use the supplied **full-detail white sandal** on the handoff's **#1F5FB8 blue**. The artwork is copied unchanged from `Design/handoff/assets/talaria-mark-white.png`. Its original 1024×1024 transparent canvas supplies the spacing; no extra inset or baked-in rounded rectangle is added.
 
-The Mac workspace uses the exact light palette and point sizes in `TalariaTheme.swift`, with custom glass modifiers behind the existing `TalariaStyle` interface. The iOS catalog retains adaptive colors, high-contrast variants and Dynamic Type under `TalariaMobileAccent`. Activity pulses respect Reduce Motion. The Mac workspace follows screen 4a; the iPhone floating-chrome redesign is a subsequent step.
-
-The Icon Composer app icon still uses the earlier wing artwork described below; replacing the launcher icon is separate from this in-app mark/layout pass.
-
-## Earlier identity and existing launcher icon
-
-The following records the original artwork, not the current interface palette.
-
-Talaria uses a swept wing, suggesting the winged sandals of Hermes. The highlighter-green panels borrow the color and curved surface rhythm of the Talaria running shoe. The mark is original artwork, with no Nike wordmark or Swoosh.
+The shared Icon Composer document leaves the fine white lines opaque, without a glass distortion or cast shadow on the foreground. The OS supplies the native enclosure, lighting, and appearance variants. The former green wing is retired from the launcher.
 
 ## Assets
 
-- `talaria-wing.png`: original 1254 × 1254 transparent PNG, preserved without retouching. This is the reusable logo foreground.
-- `talaria-app-icon.png`: Xcode-rendered Mac fallback icon preview, exported from the compiled `.icns`; the app itself uses the dynamic icon catalog on current systems.
-- `../../Apps/Shared/Talaria.icon`: shared Icon Composer document for Mac, iPhone and iPad. A graphite background and independent wing layer let the OS render its glass, highlights, enclosure and appearance variants.
-- `../../Sources/HermesUI/Resources/TalariaAssets.xcassets`: in-app template mark and adaptive accent colors.
-
-The source PNG is raster artwork. It is not an editable vector master. The in-app mark uses the alpha silhouette as a template, while the app icon retains the green panel detail.
-
-Actual build screenshots: [Mac welcome](../../research/screenshots/talaria-mac-glass-welcome.png), [Mac composer](../../research/screenshots/talaria-mac-glass-composer.png), [iPhone light](../../research/screenshots/talaria-ios-glass-light.png), [iPhone dark](../../research/screenshots/talaria-ios-glass-dark.png). The Mac composer screenshot uses an isolated local test gateway; its visible text is an unsent draft at capture time.
-
-## Palette
+- `../../Apps/Shared/Talaria.icon`: the single Icon Composer source used by both application targets.
+- `../../Apps/Shared/Talaria.icon/Assets/talaria-mark-white.png`: unchanged full-detail handoff foreground for launcher icons.
+- `talaria-app-icon.png`: preview exported from the compiled Mac fallback `.icns`, also displayed in the repository README.
+- `talaria-app-icon-ios.png`: iOS 27 default appearance rendered by Apple's Icon Composer tool.
+- `../../Sources/HermesUI/Resources/TalariaAssets.xcassets/TalariaMark.imageset`: supplied SVG used as an accent-tinted template inside the app.
+- `talaria-wing.png`: retained only as an archive of the earlier identity.
 
 | Use | Color |
 | --- | --- |
-| Wing and prominent control fill | Volt `#CEFA45` |
-| Icon background / prominent control text | Graphite `#181E17` |
-| Light appearance links and template mark | Deep green `#3F5B0A` |
-| Dark appearance links and template mark | Volt `#CEFA45` |
+| Launcher background, light links and in-app mark | `#1F5FB8` |
+| Prominent buttons and running indicators | `#3B7DDD` |
+| Dark appearance links and in-app mark | `#7FB0F0` |
+| Needs you | `#B8640A` light / `#E8A24A` dark |
 
-High-contrast accent variants are supplied in the color catalog. Conversation text uses semantic system colors and fonts. Bright volt is a filled accent with dark text, rather than small text on white.
+Use the full-detail PNG for the launcher and the vector mark for in-app labels and controls, as specified by the handoff. Do not substitute the archived green artwork or the old icon PNG bundled inside the original handoff's `Design/Brand` folder.
 
-## Interface
+## Build and verify
 
-Keep Liquid Glass in the control layer: native toolbars, buttons and the floating message composer. Preserve quiet, ordinary surfaces behind messages, reasoning, tools and forms. Native navigation and sheets inherit the current OS treatment automatically. A compact iPhone sidebar includes a direct connection action instead of an empty list.
+Build with Xcode 27. Both targets set `ASSETCATALOG_COMPILER_APPICON_NAME = Talaria` and include the shared `.icon` document as a resource. No separate competing AppIcon catalog is needed. Xcode produces native appearance renditions and older-system fallback icons.
 
-The shared controls use the system glass APIs on iOS/macOS 26 and later, including OS 27 refinements. Older runtimes receive system material and bordered-button fallbacks. Custom glass becomes an opaque semantic surface when Reduce Transparency or Increase Contrast is enabled. The original version added no custom motion; the new activity indicators add a reduced-motion-aware pulse. Controls use semantic fonts; primary iPhone actions and attachment removal have generous touch targets.
+Mac verification extracts `Talaria.icns` from the compiled application with `iconutil`; iOS verification inspects the compiled `Talaria60x60@2x.png` and primary-icon metadata. The iOS simulator install updates the existing app in place.
 
-Build with Xcode 27. Both targets use the same `.icon` document. The explicit `type: file` resource entry in `project.yml` preserves the document as a bundle with the installed XcodeGen 2.44.1. Regenerate the project with `xcodegen generate` after changing its build settings. Asset compilation produces the runtime variants and older-OS fallback icons.
+Liquid Glass stays on native controls and floating chrome in the app. Older systems use native material/button fallbacks; accessibility settings retain the existing opaque surfaces and reduced motion.
 
-## Generation record
+## Historical generation record — retired green wing
 
 Generated with the built-in `image_gen` tool in **generate** mode on 17 September 2026; no fallback CLI or API key was used. The selected output was copied into this project and into its native asset bundles. Source generation: `exec-595557be-55f3-4e30-8b38-22cc39d87247.png`.
 
