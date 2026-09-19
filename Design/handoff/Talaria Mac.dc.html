@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><style>body{margin:0;background:#ecebe7;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,sans-serif;-webkit-font-smoothing:antialiased;color:#1a1c1a}a{color:#3F5B0A}a:hover{color:#2c4006}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 -apple-system,system-ui,sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12px/1.3 -apple-system,system-ui,sans-serif;color:rgba(0,0,0,.6)}.dv-card{max-width:100%;border-radius:12px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.28),0 0 0 1px rgba(0,0,0,.18)}.dv-opt:target .dv-oid{background:#3F5B0A;color:#fff}.dv-next{margin:22px 0 0;font:12px/1.5 -apple-system,system-ui,sans-serif;color:rgba(0,0,0,.5)}@keyframes tal-pulse{0%,100%{opacity:.35}50%{opacity:1}}</style></helmet>
+
+<section class="dv-turn" id="t4">
+<div class="dv-thd"><a class="dv-tid" href="#t4">4</a><span class="dv-tname"><a class="dv-oid" href="#3a">3a</a> — tabs removed (sidebar owns sessions), glassier side panels · dotted-trace mark</span></div>
+<div style="max-width:880px;margin:0 0 28px;padding:14px 20px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:10px;font-size:12.5px;line-height:1.55;color:#3a3d3a">Sessions live in one place. A <strong>Navigation</strong> tweak (Sidebar / Tabs) switches <a class="dv-oid" href="#4a">4a</a> between the two — never both. Side panels are now real glass: more see-through, heavier blur and saturation, and the wallpaper has enough color to show it. <a class="dv-oid" href="#4b">4b</a> is the mark: the front sandal from your drawing on a solid field.</div>
+<div class="dv-opts">
+
+<!-- 4a -->
+<div class="dv-opt" id="4a"><div class="dv-olabel"><a class="dv-oid" href="#4a">4a</a>Sidebar navigation · glass side panels · dotted mark in the header</div>
+<div class="dv-card" style="width:1180px;height:760px;position:relative;background:radial-gradient(700px 420px at 8% 10%,#b9cdf0 0%,transparent 60%),radial-gradient(600px 400px at 95% 20%,#f1d3c0 0%,transparent 60%),radial-gradient(800px 500px at 70% 100%,#d5c7ee 0%,transparent 60%),#e4e6ea" data-screen-label="4a Sidebar nav">
+<div style="position:absolute;inset:0;display:grid;grid-template-columns:240px minmax(0,1fr) 290px">
+  <div style="background:rgba(255,255,255,.28);backdrop-filter:blur(60px) saturate(1.9);border-right:1px solid rgba(255,255,255,.5);box-shadow:inset 1px 0 0 rgba(255,255,255,.35);display:flex;flex-direction:column">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 14px">
+      <span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span>
+      <span style="display:flex;align-items:center;gap:1px;margin:0 auto 0 4px"><img src="assets/talaria-mark-ink-mid.png" alt="Talaria" style="width:28px;height:28px;display:block;flex:none;margin-right:-3px"><span style="font:600 16px/1 'New York','Iowan Old Style','Palatino',Georgia,serif;letter-spacing:.1px;color:#1a1c1a;padding-top:3px">Talaria</span></span>
+      <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 3px rgba(0,0,0,.08);display:grid;place-items:center;color:#1F5FB8;font-size:15px">✎</div>
+    </div>
+    <div style="margin:2px 12px 10px;height:28px;border-radius:8px;background:rgba(255,255,255,.35);border:1px solid rgba(255,255,255,.5);display:flex;align-items:center;gap:6px;padding:0 9px;color:rgba(0,0,0,.45);font-size:12px">⌕ Find a conversation</div>
+    <sc-if value="{{ sidebarSessions }}" hint-placeholder-val="{{ true }}">
+    <div style="padding:0 8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow:hidden">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:8px 10px 4px">Today</div>
+      <div style="padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.7);box-shadow:0 1px 3px rgba(0,0,0,.05);display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#1a1c1a">Plan a long weekend in Lisbon<div style="flex:1"></div><span style="width:7px;height:7px;border-radius:50%;background:#3B7DDD;animation:tal-pulse 1.4s infinite"></span></div><div style="font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Writing itinerary.md…</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="font-size:13px;font-weight:500">Summarize this week's inbox</div><div style="font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">3 things need a reply before Friday</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500">Tidy the Downloads folder<div style="flex:1"></div><span style="font-size:10px;color:#1F5FB8;font-weight:600">NEEDS YOU</span></div><div style="font-size:11.5px;color:rgba(0,0,0,.5)">Approve: move 142 files to Archive</div></div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Yesterday</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Rewrite the landlord email</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Compare three e-bikes</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Dinner ideas from what's in the fridge</div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Folders</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(59,125,221,.45)"></span>Trips</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(0,0,0,.18)"></span>Home admin</div>
+    </div>
+    </sc-if>
+    <sc-if value="{{ tabSessions }}" hint-placeholder-val="{{ false }}">
+    <div style="padding:0 8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow:hidden">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:8px 10px 4px">Folders</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center;border-radius:8px;background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.7)"><span style="width:14px;height:11px;border-radius:3px;background:rgba(59,125,221,.45)"></span>Trips</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(0,0,0,.18)"></span>Home admin</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(0,0,0,.18)"></span>Work</div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Hermes</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:9px;align-items:center"><span style="width:14px;text-align:center;color:rgba(0,0,0,.5)">✦</span>Skills</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:9px;align-items:center"><span style="width:14px;text-align:center;color:rgba(0,0,0,.5)">◷</span>Schedules</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:9px;align-items:center"><span style="width:14px;text-align:center;color:rgba(0,0,0,.5)">▦</span>Kanban</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:9px;align-items:center"><span style="width:14px;text-align:center;color:rgba(0,0,0,.5)">⚙</span>Settings</div>
+    </div>
+    </sc-if>
+    <div style="border-top:1px solid rgba(255,255,255,.5);padding:10px 12px;display:grid;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;padding:4px 6px"><span style="color:rgba(0,0,0,.45)">▤</span> Personal <div style="flex:1"></div><span style="color:rgba(0,0,0,.4);font-size:10px">⌃⌄</span></div>
+      <div style="display:flex;align-items:center;gap:9px;padding:4px 6px"><span style="width:7px;height:7px;border-radius:50%;background:#3B7DDD"></span><div style="display:grid;gap:1px"><div style="font-size:12.5px;font-weight:500">Hermes on this Mac</div><div style="font-size:11px;color:rgba(0,0,0,.5)">Connected</div></div><div style="flex:1"></div><span style="color:rgba(0,0,0,.45)">≋</span></div>
+    </div>
+  </div>
+  <div style="position:relative;display:flex;flex-direction:column;min-width:0;background:rgba(255,255,255,.6);backdrop-filter:blur(40px)">
+    <div style="height:52px;display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid rgba(0,0,0,.06)">
+      
+      <sc-if value="{{ tabSessions }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1">
+        <div style="width:1px;height:18px;background:rgba(0,0,0,.1);margin:0 4px;flex:none"></div>
+        <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,.85);box-shadow:inset 0 1px 0 #fff,0 1px 3px rgba(0,0,0,.1);display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#3B7DDD;animation:tal-pulse 1.4s infinite"></span>Lisbon weekend<span style="color:rgba(0,0,0,.35);margin-left:6px;font-size:11px">✕</span></div>
+        <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;font-size:12.5px;color:rgba(0,0,0,.6)">Inbox summary</div>
+        <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px;font-size:12.5px;color:rgba(0,0,0,.6)">Downloads<span style="width:6px;height:6px;border-radius:50%;background:#3B7DDD"></span></div>
+        <div style="width:32px;height:32px;flex:none;border-radius:16px;display:grid;place-items:center;color:rgba(0,0,0,.45);font-size:17px">+</div>
+      </div>
+      </sc-if>
+      <sc-if value="{{ sidebarSessions }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;padding-left:4px">
+        <div style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Plan a long weekend in Lisbon</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#3B7DDD;animation:tal-pulse 1.4s infinite"></span>Working · 48s</div>
+      </div>
+      </sc-if>
+      <div style="width:30px;height:30px;flex:none;border-radius:15px;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.8);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 2px rgba(0,0,0,.08);display:grid;place-items:center;color:rgba(0,0,0,.6);font-size:13px">⧉</div>
+    </div>
+    <div style="flex:1;overflow:hidden;padding:26px 36px 0;display:grid;gap:26px;align-content:start;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="display:grid;gap:8px"><div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.5)">You</div><div style="font-size:13.5px;line-height:1.55">Plan a long weekend in Lisbon for the second weekend of October. Check my calendar so it doesn't clash, keep it under €900 for two, and save the plan as a file I can share with Ana.</div></div>
+      <div style="display:grid;gap:12px">
+        <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.5);display:flex;gap:8px;align-items:center"><img src="assets/talaria-mark-ink-mid.png" alt="" style="width:16px;height:16px;display:block;flex:none">Hermes</div>
+        <div style="font-size:12px;color:rgba(0,0,0,.55);display:flex;gap:8px;align-items:center"><span style="font-size:10px">▸</span>Thought for 9s</div>
+        <div style="border:1px solid rgba(255,255,255,.8);border-radius:12px;background:rgba(255,255,255,.55);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#1F5FB8">✓</span><span style="font-weight:600">calendar</span><span style="color:rgba(0,0,0,.6)">Oct 9–12 · no conflicts, Ana free from Fri 6pm</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#1F5FB8">✓</span><span style="font-weight:600">web_search</span><span style="color:rgba(0,0,0,.6)">flights ZRH → LIS Oct 9 return Oct 12</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">4 sources</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#1F5FB8">✓</span><span style="font-weight:600">web_search</span><span style="color:rgba(0,0,0,.6)">Alfama apartments 3 nights, two guests</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">6 sources</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #3B7DDD;border-right-color:transparent"></span><span style="font-weight:600">write_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">Trips/Lisbon/itinerary.md</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">writing</span></div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.6">Friday evening flight out of Zurich, back Monday night — that keeps Monday's 9am standup clear. I found a two-bedroom in Alfama at €118/night and flights for €164 each, so you're at about €690 before food. I'm writing the day-by-day plan now: Saturday is Belém and the tram 28 loop, Sunday a slow morning then LX Factory.<span style="display:inline-block;width:7px;height:14px;background:#3B7DDD;vertical-align:-2px;margin-left:2px;animation:tal-pulse 1s infinite"></span></div>
+      </div>
+    </div>
+    <div style="padding:14px 36px 18px;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="border-radius:26px;background:rgba(255,255,255,.45);backdrop-filter:blur(30px) saturate(1.8);border:1px solid rgba(255,255,255,.9);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 10px 30px rgba(10,25,50,.14);padding:14px 14px 10px;display:grid;gap:10px">
+        <div style="font-size:13.5px;color:rgba(0,0,0,.35);padding:2px 4px;min-height:36px">Message Hermes…</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(0,0,0,.6)">⌇</div>
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(0,0,0,.6)">···</div>
+          <div style="height:26px;padding:0 10px;border-radius:13px;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.7);font-size:11.5px;display:flex;align-items:center;gap:6px;color:rgba(0,0,0,.65)">claude-sonnet-4.5 · High <span style="font-size:9px">▾</span></div>
+          <div style="flex:1"></div>
+          <div style="height:36px;padding:0 16px;border-radius:18px;background:#3B7DDD;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 6px rgba(59,125,221,.35);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600">■ Stop</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="background:rgba(255,255,255,.28);backdrop-filter:blur(60px) saturate(1.9);border-left:1px solid rgba(255,255,255,.5);display:flex;flex-direction:column;min-width:0">
+    <div style="height:52px;display:flex;align-items:center;padding:0 10px;gap:2px;border-bottom:1px solid rgba(255,255,255,.5)">
+      <div style="height:28px;padding:0 12px;border-radius:14px;background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.8);box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.08);font-size:12px;font-weight:600;display:flex;align-items:center">Files</div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(0,0,0,.55);display:flex;align-items:center">Sources <span style="margin-left:5px;font-size:10px;font-weight:600;color:#1F5FB8">10</span></div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(0,0,0,.55);display:flex;align-items:center">Terminal</div>
+    </div>
+    <div style="padding:10px 12px;font:12px/1.9 -apple-system,system-ui,sans-serif;color:#1a1c1a">
+      <div style="display:flex;gap:6px;align-items:center;font-weight:600"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> Trips</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> Lisbon</div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center;background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.7);border-radius:6px;margin:0 -6px;padding-right:6px"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>itinerary.md<div style="flex:1"></div><span style="font-size:10px;color:#1F5FB8;font-weight:600">NEW</span></div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>budget.numbers</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▸</span> Kyoto 2025</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center;color:rgba(0,0,0,.6)"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>packing-list.md</div>
+    </div>
+    <div style="margin:6px 12px 0;flex:1;border-radius:10px;background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.8);overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:7px 10px;font-size:11px;color:rgba(0,0,0,.5);border-bottom:1px solid rgba(0,0,0,.06);display:flex;gap:8px">itinerary.md <div style="flex:1"></div>Rendered · live</div>
+      <div style="padding:12px 14px;font-size:12px;line-height:1.55;color:#2a2e2a;display:grid;gap:8px">
+        <div style="font-size:14px;font-weight:700">Lisbon · Oct 9–12</div>
+        <div style="color:rgba(0,0,0,.6)">Two people · budget €900 · est. €690 + food</div>
+        <div><strong>Fri</strong> — ZRH 18:40 → LIS 20:35. Check in Alfama, late dinner at a tasca nearby.</div>
+        <div><strong>Sat</strong> — Belém morning: pastéis, MAAT. Tram 28 back through Graça for sunset.</div>
+        <div><strong>Sun</strong> — Slow morning. LX Factory market, then the river walk to Cais do Sodré.</div>
+        <div style="color:rgba(0,0,0,.45)"><strong>Mon</strong> — <span style="display:inline-block;width:6px;height:12px;background:#3B7DDD;vertical-align:-2px;animation:tal-pulse 1s infinite"></span></div>
+      </div>
+    </div>
+    <div style="padding:12px;display:grid;gap:8px">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45)">Status</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#1F5FB8">☑</span>Check calendar for clashes</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#1F5FB8">☑</span>Find flights and a place to stay</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #3B7DDD;border-right-color:transparent;margin:0 1px"></span>Write the itinerary</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:rgba(0,0,0,.5)"><span>☐</span>Share with Ana</div>
+    </div>
+  </div>
+</div>
+</div></div>
+
+<!-- 4b dotted mark -->
+<div class="dv-opt" id="4b"><div class="dv-olabel"><a class="dv-oid" href="#4b">4b</a>Mark · the front sandal from your drawing, on a solid field — <strong>Mid cut chosen</strong></div>
+<div class="dv-card" style="width:520px;background:#fff;padding:28px;display:grid;gap:22px;box-sizing:border-box">
+  <div style="display:flex;gap:20px;align-items:center">
+    <span style="display:inline-grid;place-items:center;width:120px;height:120px;border-radius:26px;background:#1F5FB8;flex:none;"><img src="assets/talaria-mark-white-mid.png" alt="" style="width:120px;height:120px;display:block"></span>
+    <span style="display:inline-grid;place-items:center;width:120px;height:120px;border-radius:26px;background:#f2f0ec;flex:none;"><img src="assets/talaria-mark-ink-mid.png" alt="" style="width:120px;height:120px;display:block"></span>
+    <div style="display:grid;gap:12px;align-items:end"><span style="display:inline-grid;place-items:center;width:48px;height:48px;border-radius:11px;background:#1F5FB8;flex:none;"><img src="assets/talaria-mark-white-mid.png" alt="" style="width:48px;height:48px;display:block"></span><span style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:5px;background:#1F5FB8;flex:none;"><img src="assets/talaria-mark-white-mid.png" alt="" style="width:22px;height:22px;display:block"></span></div>
+  </div>
+  <div style="display:grid;gap:16px;padding-top:6px;border-top:1px solid rgba(0,0,0,.08)">
+  <div style="display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:center"><div style="font-size:11px;font-weight:600;color:#1F5FB8">In-app</div><div style="display:flex;gap:16px;align-items:center"><img src="assets/talaria-mark-ink-mid.png" alt="" style="width:48px;height:48px"><img src="assets/talaria-mark-ink-mid.png" alt="" style="width:30px;height:30px"><img src="assets/talaria-mark-ink-mid.png" alt="" style="width:16px;height:16px"><span style="font-size:11px;color:rgba(0,0,0,.5);line-height:1.4;margin-left:auto;max-width:150px">Bare, accent-tinted — toolbars and avatars. The squircle is for the app icon only.</span></div></div>
+  <div style="display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:center"><div style="font-size:11px;font-weight:600;color:#1F5FB8">Wordmark</div><div style="display:flex;gap:22px;align-items:center"><span style="display:flex;align-items:center;gap:0"><img src="assets/talaria-mark-ink-mid.png" alt="" style="width:36px;height:36px;margin-right:-4px"><span style="font:600 26px/1 'New York','Iowan Old Style','Palatino',Georgia,serif;color:#1a1c1a">Talaria</span></span><span style="display:flex;align-items:center;gap:0"><img src="assets/talaria-mark-ink-mid.png" alt="" style="width:22px;height:22px;margin-right:-2px"><span style="font:600 16px/1 'New York','Iowan Old Style','Palatino',Georgia,serif;color:#1a1c1a">Talaria</span></span><span style="font-size:11px;color:rgba(0,0,0,.5);line-height:1.4;margin-left:auto;max-width:150px">New York semibold — Apple's system serif, so it ships with the OS.</span></div></div>
+  <div style="display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:center"><div style="font-size:11px;font-weight:600;color:#1F5FB8">Vector</div><div style="display:flex;gap:16px;align-items:center"><img src="assets/talaria-mark-ink.svg" alt="" style="width:96px;height:96px"><img src="assets/talaria-mark-ink.svg" alt="" style="width:48px;height:48px"><img src="assets/talaria-mark-ink.svg" alt="" style="width:30px;height:30px"><img src="assets/talaria-mark-ink.svg" alt="" style="width:16px;height:16px"><span style="font-size:11px;color:rgba(0,0,0,.5);line-height:1.4;margin-left:auto;max-width:150px">Redrawn as a single SVG path from the Mid cut — ship this one. <code style="font:10.5px ui-monospace,Menlo,monospace">assets/talaria-mark.svg</code> (currentColor)</span></div></div>
+  <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45)">App icon · three cuts</div>
+  <div style="display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:center"><div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.55)">Full</div><div style="display:flex;gap:14px;align-items:flex-end"><span style="display:inline-grid;place-items:center;width:96px;height:96px;border-radius:21px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white.png" alt="" style="width:96px;height:96px;display:block"></span><span style="display:inline-grid;place-items:center;width:48px;height:48px;border-radius:11px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white.png" alt="" style="width:48px;height:48px;display:block"></span><span style="display:inline-grid;place-items:center;width:32px;height:32px;border-radius:7px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white.png" alt="" style="width:32px;height:32px;display:block"></span><span style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:5px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white.png" alt="" style="width:22px;height:22px;display:block"></span><span style="display:inline-grid;place-items:center;width:16px;height:16px;border-radius:4px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white.png" alt="" style="width:16px;height:16px;display:block"></span><span style="font-size:11px;color:rgba(0,0,0,.5);line-height:1.4;margin-left:auto;max-width:110px">App icon, 64px and up</span></div></div>
+  <div style="display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:center"><div style="font-size:11px;font-weight:600;color:#1F5FB8">Mid ✓</div><div style="display:flex;gap:14px;align-items:flex-end"><span style="display:inline-grid;place-items:center;width:96px;height:96px;border-radius:21px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white-mid.png" alt="" style="width:96px;height:96px;display:block"></span><span style="display:inline-grid;place-items:center;width:48px;height:48px;border-radius:11px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white-mid.png" alt="" style="width:48px;height:48px;display:block"></span><span style="display:inline-grid;place-items:center;width:32px;height:32px;border-radius:7px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white-mid.png" alt="" style="width:32px;height:32px;display:block"></span><span style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:5px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white-mid.png" alt="" style="width:22px;height:22px;display:block"></span><span style="display:inline-grid;place-items:center;width:16px;height:16px;border-radius:4px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white-mid.png" alt="" style="width:16px;height:16px;display:block"></span><span style="font-size:11px;color:rgba(0,0,0,.5);line-height:1.4;margin-left:auto;max-width:110px">Sidebar header, 24–48px</span></div></div>
+  <div style="display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:center"><div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.55)">Small</div><div style="display:flex;gap:14px;align-items:flex-end"><span style="display:inline-grid;place-items:center;width:96px;height:96px;border-radius:21px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white-small.png" alt="" style="width:96px;height:96px;display:block"></span><span style="display:inline-grid;place-items:center;width:48px;height:48px;border-radius:11px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white-small.png" alt="" style="width:48px;height:48px;display:block"></span><span style="display:inline-grid;place-items:center;width:32px;height:32px;border-radius:7px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white-small.png" alt="" style="width:32px;height:32px;display:block"></span><span style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:5px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white-small.png" alt="" style="width:22px;height:22px;display:block"></span><span style="display:inline-grid;place-items:center;width:16px;height:16px;border-radius:4px;background:#1F5FB8;flex:none"><img src="assets/talaria-mark-white-small.png" alt="" style="width:16px;height:16px;display:block"></span><span style="font-size:11px;color:rgba(0,0,0,.5);line-height:1.4;margin-left:auto;max-width:110px">Toolbar, menu bar, 16–22px</span></div></div>
+</div>
+<div style="font-size:12px;line-height:1.55;color:rgba(0,0,0,.6)">Mid and Small are derived from the full cut by softening then re-thresholding the ink, so hatching merges into solid strokes and the wing becomes a silhouette. Files: <code style="font:11px ui-monospace,Menlo,monospace">assets/talaria-mark-{white,ink}{,-mid,-small}.png</code>.</div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: "here's a reference image of a talaria — retrace it" · "switch the Navigation tweak to Tabs" · "build Skills, Schedules, Kanban, Settings and Onboarding in <a class="dv-oid" href="#4a">4a</a>'s style"</p>
+</section>
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname"><a class="dv-oid" href="#2b">2b</a> with a Talaria mark in the header · two logo directions · an everyday task</span></div>
+<div style="max-width:880px;margin:0 0 28px;padding:14px 20px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:10px;font-size:12.5px;line-height:1.55;color:#3a3d3a">Talaria are Hermes' winged sandals — speed, errands run on your behalf. Both marks are built from a heel disc and feather strokes so they hold up at 16px in a toolbar and as a glass app icon. <strong>3a</strong> uses mark <strong>3b</strong> (three feathers lifting off the heel); <strong>3c</strong> is the alternative (a tilted sole with two feathers). Task swapped for planning a Lisbon trip: search → read the calendar → write an itinerary.</div>
+<div class="dv-opts">
+
+<!-- 3a -->
+<div class="dv-opt" id="3a"><div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>Blue · light · logo as the app menu at the head of the tab strip</div>
+<div class="dv-card" style="width:1180px;height:760px;position:relative;background:linear-gradient(160deg,#dfe5ec 0%,#e4e6ea 45%,#e8e4e2 100%)" data-screen-label="3a Lisbon trip">
+<div style="position:absolute;inset:0;display:grid;grid-template-columns:240px minmax(0,1fr) 290px">
+  <div style="background:rgba(255,255,255,.42);backdrop-filter:blur(40px) saturate(1.5);border-right:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 14px">
+      <span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span>
+      <div style="flex:1"></div>
+      <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 2px rgba(0,0,0,.08);display:grid;place-items:center;color:#1F5FB8;font-size:15px">✎</div>
+    </div>
+    <div style="margin:2px 12px 10px;height:28px;border-radius:8px;background:rgba(0,0,0,.05);display:flex;align-items:center;gap:6px;padding:0 9px;color:rgba(0,0,0,.4);font-size:12px">⌕ Find a conversation</div>
+    <div style="padding:0 8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow:hidden">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:8px 10px 4px">Today</div>
+      <div style="padding:8px 10px;border-radius:8px;background:rgba(59,125,221,.16);display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#1a1c1a">Plan a long weekend in Lisbon<div style="flex:1"></div><span style="width:7px;height:7px;border-radius:50%;background:#3B7DDD;animation:tal-pulse 1.4s infinite"></span></div><div style="font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Writing itinerary.md…</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="font-size:13px;font-weight:500">Summarize this week's inbox</div><div style="font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">3 things need a reply before Friday</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500">Tidy the Downloads folder<div style="flex:1"></div><span style="font-size:10px;color:#1F5FB8;font-weight:600">NEEDS YOU</span></div><div style="font-size:11.5px;color:rgba(0,0,0,.5)">Approve: move 142 files to Archive</div></div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Yesterday</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Rewrite the landlord email</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Compare three e-bikes</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Dinner ideas from what's in the fridge</div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Folders</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(59,125,221,.45)"></span>Trips</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(0,0,0,.18)"></span>Home admin</div>
+    </div>
+    <div style="border-top:1px solid rgba(0,0,0,.07);padding:10px 12px;display:grid;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;padding:4px 6px"><span style="color:rgba(0,0,0,.45)">▤</span> Personal <div style="flex:1"></div><span style="color:rgba(0,0,0,.4);font-size:10px">⌃⌄</span></div>
+      <div style="display:flex;align-items:center;gap:9px;padding:4px 6px"><span style="width:7px;height:7px;border-radius:50%;background:#3B7DDD"></span><div style="display:grid;gap:1px"><div style="font-size:12.5px;font-weight:500">Hermes on this Mac</div><div style="font-size:11px;color:rgba(0,0,0,.5)">Connected</div></div><div style="flex:1"></div><span style="color:rgba(0,0,0,.45)">≋</span></div>
+    </div>
+  </div>
+  <div style="position:relative;display:flex;flex-direction:column;min-width:0;background:rgba(255,255,255,.62)">
+    <div style="height:52px;display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid rgba(0,0,0,.06)">
+      <!-- logo affordance: app menu -->
+      <div style="height:32px;padding:0 10px 0 6px;flex:none;border-radius:16px;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.06)">
+        <svg width="22" height="22" viewBox="0 0 64 64" aria-label="Talaria"><circle cx="20" cy="44" r="12" fill="#1F5FB8"></circle><g transform="rotate(-24 20 44)"><rect x="24" y="30" width="34" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="41" width="26" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="52" width="16" height="8" rx="4" fill="#3B7DDD"></rect></g></svg>
+        <span style="font-size:12.5px;font-weight:700;letter-spacing:-.2px;color:#1a1c1a">Talaria</span><span style="font-size:9px;color:rgba(0,0,0,.4)">▾</span>
+      </div>
+      <div style="width:1px;height:18px;background:rgba(0,0,0,.1);margin:0 4px;flex:none"></div>
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,.85);box-shadow:inset 0 1px 0 #fff,0 1px 3px rgba(0,0,0,.1);display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#3B7DDD;animation:tal-pulse 1.4s infinite"></span>Lisbon weekend<span style="color:rgba(0,0,0,.35);margin-left:6px;font-size:11px">✕</span></div>
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;font-size:12.5px;color:rgba(0,0,0,.6)">Inbox summary</div>
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px;font-size:12.5px;color:rgba(0,0,0,.6)">Downloads<span style="width:6px;height:6px;border-radius:50%;background:#3B7DDD"></span></div>
+      <div style="width:32px;height:32px;flex:none;border-radius:16px;display:grid;place-items:center;color:rgba(0,0,0,.45);font-size:17px">+</div>
+      <div style="flex:1"></div>
+      <div style="width:30px;height:30px;flex:none;border-radius:15px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 2px rgba(0,0,0,.08);display:grid;place-items:center;color:rgba(0,0,0,.6);font-size:13px">⧉</div>
+    </div>
+    <div style="flex:1;overflow:hidden;padding:26px 36px 0;display:grid;gap:26px;align-content:start;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="display:flex;gap:10px;align-items:center;font-size:11.5px;color:rgba(0,0,0,.5)"><span style="width:6px;height:6px;border-radius:50%;background:#3B7DDD;animation:tal-pulse 1.4s infinite"></span>Working · 48s<div style="flex:1"></div>~/Trips/Lisbon</div>
+      <div style="display:grid;gap:8px"><div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.5)">You</div><div style="font-size:13.5px;line-height:1.55">Plan a long weekend in Lisbon for the second weekend of October. Check my calendar so it doesn't clash, keep it under €900 for two, and save the plan as a file I can share with Ana.</div></div>
+      <div style="display:grid;gap:12px">
+        <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.5);display:flex;gap:8px;align-items:center"><svg width="14" height="14" viewBox="0 0 64 64"><circle cx="20" cy="44" r="12" fill="#1F5FB8"></circle><g transform="rotate(-24 20 44)"><rect x="24" y="30" width="34" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="41" width="26" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="52" width="16" height="8" rx="4" fill="#3B7DDD"></rect></g></svg>Hermes</div>
+        <div style="font-size:12px;color:rgba(0,0,0,.55);display:flex;gap:8px;align-items:center"><span style="font-size:10px">▸</span>Thought for 9s</div>
+        <div style="border:1px solid rgba(0,0,0,.08);border-radius:12px;background:rgba(255,255,255,.7);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#1F5FB8">✓</span><span style="font-weight:600">calendar</span><span style="color:rgba(0,0,0,.6)">Oct 9–12 · no conflicts, Ana free from Fri 6pm</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#1F5FB8">✓</span><span style="font-weight:600">web_search</span><span style="color:rgba(0,0,0,.6)">flights ZRH → LIS Oct 9 return Oct 12</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">4 sources</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#1F5FB8">✓</span><span style="font-weight:600">web_search</span><span style="color:rgba(0,0,0,.6)">Alfama apartments 3 nights, two guests</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">6 sources</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #3B7DDD;border-right-color:transparent"></span><span style="font-weight:600">write_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">Trips/Lisbon/itinerary.md</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">writing</span></div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.6">Friday evening flight out of Zurich, back Monday night — that keeps Monday's 9am standup clear. I found a two-bedroom in Alfama at €118/night and flights for €164 each, so you're at about €690 before food. I'm writing the day-by-day plan now: Saturday is Belém and the tram 28 loop, Sunday a slow morning then LX Factory.<span style="display:inline-block;width:7px;height:14px;background:#3B7DDD;vertical-align:-2px;margin-left:2px;animation:tal-pulse 1s infinite"></span></div>
+      </div>
+    </div>
+    <div style="padding:14px 36px 18px;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="border-radius:26px;background:rgba(255,255,255,.55);backdrop-filter:blur(30px) saturate(1.6);border:1px solid rgba(255,255,255,.9);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 10px 30px rgba(10,25,50,.14);padding:14px 14px 10px;display:grid;gap:10px">
+        <div style="font-size:13.5px;color:rgba(0,0,0,.35);padding:2px 4px;min-height:36px">Message Hermes…</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(0,0,0,.6)">⌇</div>
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(0,0,0,.6)">···</div>
+          <div style="height:26px;padding:0 10px;border-radius:13px;background:rgba(0,0,0,.05);font-size:11.5px;display:flex;align-items:center;gap:6px;color:rgba(0,0,0,.65)">claude-sonnet-4.5 · High <span style="font-size:9px">▾</span></div>
+          <div style="flex:1"></div>
+          <div style="height:36px;padding:0 16px;border-radius:18px;background:#3B7DDD;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 6px rgba(59,125,221,.35);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600">■ Stop</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="background:rgba(255,255,255,.42);backdrop-filter:blur(40px) saturate(1.5);border-left:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;min-width:0">
+    <div style="height:52px;display:flex;align-items:center;padding:0 10px;gap:2px;border-bottom:1px solid rgba(0,0,0,.06)">
+      <div style="height:28px;padding:0 12px;border-radius:14px;background:rgba(255,255,255,.8);box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.08);font-size:12px;font-weight:600;display:flex;align-items:center">Files</div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(0,0,0,.55);display:flex;align-items:center">Sources <span style="margin-left:5px;font-size:10px;font-weight:600;color:#1F5FB8">10</span></div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(0,0,0,.55);display:flex;align-items:center">Terminal</div>
+    </div>
+    <div style="padding:10px 12px;font:12px/1.9 -apple-system,system-ui,sans-serif;color:#1a1c1a">
+      <div style="display:flex;gap:6px;align-items:center;font-weight:600"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> Trips</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> Lisbon</div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center;background:rgba(59,125,221,.16);border-radius:6px;margin:0 -6px;padding-right:6px"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>itinerary.md<div style="flex:1"></div><span style="font-size:10px;color:#1F5FB8;font-weight:600">NEW</span></div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>budget.numbers</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▸</span> Kyoto 2025</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center;color:rgba(0,0,0,.6)"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>packing-list.md</div>
+    </div>
+    <div style="margin:6px 12px 0;flex:1;border-radius:10px;background:rgba(255,255,255,.75);border:1px solid rgba(0,0,0,.07);overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:7px 10px;font-size:11px;color:rgba(0,0,0,.5);border-bottom:1px solid rgba(0,0,0,.06);display:flex;gap:8px">itinerary.md <div style="flex:1"></div>Rendered · live</div>
+      <div style="padding:12px 14px;font-size:12px;line-height:1.55;color:#2a2e2a;display:grid;gap:8px">
+        <div style="font-size:14px;font-weight:700">Lisbon · Oct 9–12</div>
+        <div style="color:rgba(0,0,0,.6)">Two people · budget €900 · est. €690 + food</div>
+        <div><strong>Fri</strong> — ZRH 18:40 → LIS 20:35. Check in Alfama, late dinner at a tasca nearby.</div>
+        <div><strong>Sat</strong> — Belém morning: pastéis, MAAT. Tram 28 back through Graça for sunset.</div>
+        <div><strong>Sun</strong> — Slow morning. LX Factory market, then the river walk to Cais do Sodré.</div>
+        <div style="color:rgba(0,0,0,.45)"><strong>Mon</strong> — <span style="display:inline-block;width:6px;height:12px;background:#3B7DDD;vertical-align:-2px;animation:tal-pulse 1s infinite"></span></div>
+      </div>
+    </div>
+    <div style="padding:12px;display:grid;gap:8px">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45)">Status</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#1F5FB8">☑</span>Check calendar for clashes</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#1F5FB8">☑</span>Find flights and a place to stay</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #3B7DDD;border-right-color:transparent;margin:0 1px"></span>Write the itinerary</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:rgba(0,0,0,.5)"><span>☐</span>Share with Ana</div>
+    </div>
+  </div>
+</div>
+</div></div>
+
+<!-- 3b logo A -->
+<div class="dv-opt" id="3b"><div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a>Mark A · three feathers lifting off the heel (used in <a class="dv-oid" href="#3a">3a</a>)</div>
+<div class="dv-card" style="width:440px;background:#fff;padding:28px;display:grid;gap:24px;box-sizing:border-box">
+  <div style="display:flex;gap:24px;align-items:center">
+    <div style="width:120px;height:120px;border-radius:28px;background:linear-gradient(160deg,#4d8ee8,#1F5FB8);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -6px 14px rgba(0,0,0,.18),0 10px 24px rgba(31,95,184,.35);display:grid;place-items:center"><svg width="80" height="80" viewBox="0 0 64 64"><circle cx="20" cy="44" r="12" fill="#fff"></circle><g transform="rotate(-24 20 44)"><rect x="24" y="30" width="34" height="8" rx="4" fill="#fff" opacity=".95"></rect><rect x="24" y="41" width="26" height="8" rx="4" fill="#fff" opacity=".85"></rect><rect x="24" y="52" width="16" height="8" rx="4" fill="#fff" opacity=".75"></rect></g></svg></div>
+    <div style="display:grid;gap:14px">
+      <div style="display:flex;gap:14px;align-items:flex-end"><svg width="48" height="48" viewBox="0 0 64 64"><circle cx="20" cy="44" r="12" fill="#1F5FB8"></circle><g transform="rotate(-24 20 44)"><rect x="24" y="30" width="34" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="41" width="26" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="52" width="16" height="8" rx="4" fill="#3B7DDD"></rect></g></svg><svg width="32" height="32" viewBox="0 0 64 64"><circle cx="20" cy="44" r="12" fill="#1F5FB8"></circle><g transform="rotate(-24 20 44)"><rect x="24" y="30" width="34" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="41" width="26" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="52" width="16" height="8" rx="4" fill="#3B7DDD"></rect></g></svg><svg width="16" height="16" viewBox="0 0 64 64"><circle cx="20" cy="44" r="12" fill="#1F5FB8"></circle><g transform="rotate(-24 20 44)"><rect x="24" y="30" width="34" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="41" width="26" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="52" width="16" height="8" rx="4" fill="#3B7DDD"></rect></g></svg></div>
+      <div style="display:flex;align-items:center;gap:8px"><svg width="22" height="22" viewBox="0 0 64 64"><circle cx="20" cy="44" r="12" fill="#1F5FB8"></circle><g transform="rotate(-24 20 44)"><rect x="24" y="30" width="34" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="41" width="26" height="8" rx="4" fill="#3B7DDD"></rect><rect x="24" y="52" width="16" height="8" rx="4" fill="#3B7DDD"></rect></g></svg><span style="font-size:20px;font-weight:700;letter-spacing:-.4px;color:#1a1c1a">Talaria</span></div>
+    </div>
+  </div>
+  <div style="font-size:12px;line-height:1.55;color:rgba(0,0,0,.6)">Heel disc = the sandal; feathers rise 24° to the right = wing and motion. Single-hue, so it can be tinted by the OS glass icon and set in white on the accent.</div>
+</div></div>
+
+<!-- 3c logo B -->
+<div class="dv-opt" id="3c"><div class="dv-olabel"><a class="dv-oid" href="#3c">3c</a>Mark B · tilted sole with a two-feather wing</div>
+<div class="dv-card" style="width:440px;background:#fff;padding:28px;display:grid;gap:24px;box-sizing:border-box">
+  <div style="display:flex;gap:24px;align-items:center">
+    <div style="width:120px;height:120px;border-radius:28px;background:linear-gradient(160deg,#4d8ee8,#1F5FB8);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -6px 14px rgba(0,0,0,.18),0 10px 24px rgba(31,95,184,.35);display:grid;place-items:center"><svg width="80" height="80" viewBox="0 0 64 64"><rect x="10" y="38" width="40" height="12" rx="6" fill="#fff" transform="rotate(-14 30 44)"></rect><g transform="rotate(-40 40 36)"><rect x="40" y="22" width="20" height="7" rx="3.5" fill="#fff" opacity=".9"></rect><rect x="40" y="32" width="14" height="7" rx="3.5" fill="#fff" opacity=".8"></rect></g></svg></div>
+    <div style="display:grid;gap:14px">
+      <div style="display:flex;gap:14px;align-items:flex-end"><svg width="48" height="48" viewBox="0 0 64 64"><rect x="10" y="38" width="40" height="12" rx="6" fill="#1F5FB8" transform="rotate(-14 30 44)"></rect><g transform="rotate(-40 40 36)"><rect x="40" y="22" width="20" height="7" rx="3.5" fill="#3B7DDD"></rect><rect x="40" y="32" width="14" height="7" rx="3.5" fill="#3B7DDD"></rect></g></svg><svg width="32" height="32" viewBox="0 0 64 64"><rect x="10" y="38" width="40" height="12" rx="6" fill="#1F5FB8" transform="rotate(-14 30 44)"></rect><g transform="rotate(-40 40 36)"><rect x="40" y="22" width="20" height="7" rx="3.5" fill="#3B7DDD"></rect><rect x="40" y="32" width="14" height="7" rx="3.5" fill="#3B7DDD"></rect></g></svg><svg width="16" height="16" viewBox="0 0 64 64"><rect x="10" y="38" width="40" height="12" rx="6" fill="#1F5FB8" transform="rotate(-14 30 44)"></rect><g transform="rotate(-40 40 36)"><rect x="40" y="22" width="20" height="7" rx="3.5" fill="#3B7DDD"></rect><rect x="40" y="32" width="14" height="7" rx="3.5" fill="#3B7DDD"></rect></g></svg></div>
+      <div style="display:flex;align-items:center;gap:8px"><svg width="22" height="22" viewBox="0 0 64 64"><rect x="10" y="38" width="40" height="12" rx="6" fill="#1F5FB8" transform="rotate(-14 30 44)"></rect><g transform="rotate(-40 40 36)"><rect x="40" y="22" width="20" height="7" rx="3.5" fill="#3B7DDD"></rect><rect x="40" y="32" width="14" height="7" rx="3.5" fill="#3B7DDD"></rect></g></svg><span style="font-size:20px;font-weight:700;letter-spacing:-.4px;color:#1a1c1a">Talaria</span></div>
+    </div>
+  </div>
+  <div style="font-size:12px;line-height:1.55;color:rgba(0,0,0,.6)">More literal: a sole tilted for take-off, a small wing at the ankle. Reads as "sandal" faster; slightly busier at 16px.</div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: "use <a class="dv-oid" href="#3c">3c</a> in the header instead" · "go — build Skills, Cron, Kanban, Settings, Onboarding in <a class="dv-oid" href="#3a">3a</a>'s style" · "show the Downloads approval request inline"</p>
+</section>
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname"><a class="dv-oid" href="#1a">1a</a> structure + Safari-style session tabs from <a class="dv-oid" href="#1b">1b</a> · new palette — one accent hue per option</span></div>
+<div style="max-width:880px;margin:0 0 28px;padding:14px 20px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:10px;font-size:12.5px;line-height:1.55;color:#3a3d3a">Volt/graphite dropped. Same accent chroma and lightness across the three, only the hue changes: <strong>2a</strong> orange · <strong>2b</strong> blue · <strong>2c</strong> purple (dark). Tabs live in the chat column's toolbar; the sidebar keeps sessions grouped by day and projects.</div>
+<div class="dv-opts">
+<!-- 2a-start -->
+<div class="dv-opt" id="2a"><div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Orange · light</div>
+<div class="dv-card" style="width:1180px;height:760px;position:relative;background:linear-gradient(160deg,#ece6df 0%,#e8e6e2 45%,#e2e2e6 100%)" data-screen-label="2a Orange light">
+<div style="position:absolute;inset:0;display:grid;grid-template-columns:240px minmax(0,1fr) 290px">
+  <div style="background:rgba(255,255,255,.42);backdrop-filter:blur(40px) saturate(1.5);border-right:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 14px">
+      <span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span>
+      <div style="flex:1"></div>
+      <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 2px rgba(0,0,0,.08);display:grid;place-items:center;color:#B85A1A;font-size:15px">✎</div>
+    </div>
+    <div style="margin:2px 12px 10px;height:28px;border-radius:8px;background:rgba(0,0,0,.05);display:flex;align-items:center;gap:6px;padding:0 9px;color:rgba(0,0,0,.4);font-size:12px">⌕ Find a conversation</div>
+    <div style="padding:0 8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow:hidden">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:8px 10px 4px">Today</div>
+      <div style="padding:8px 10px;border-radius:8px;background:rgba(224,116,46,.16);display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#1a1c1a">Migrate billing worker to Swift<div style="flex:1"></div><span style="width:7px;height:7px;border-radius:50%;background:#E0742E;animation:tal-pulse 1.4s infinite"></span></div><div style="font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Running tests in /Sources/Billing…</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="font-size:13px;font-weight:500">Draft release notes v0.9</div><div style="font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Pulled 41 commits since the last tag</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500">Weekly metrics digest<div style="flex:1"></div><span style="font-size:10px;color:#B85A1A;font-weight:600">NEEDS YOU</span></div><div style="font-size:11.5px;color:rgba(0,0,0,.5)">Approve: read ~/Reports/*.csv</div></div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Yesterday</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Explain the gateway contract</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Photo library dedupe script</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">App icon variants</div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Projects</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(0,0,0,.18)"></span>talaria <span style="font-size:11px;color:rgba(0,0,0,.45)">main</span></div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(0,0,0,.18)"></span>hermes-agent <span style="font-size:11px;color:rgba(0,0,0,.45)">worktree/billing</span></div>
+    </div>
+    <div style="border-top:1px solid rgba(0,0,0,.07);padding:10px 12px;display:grid;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;padding:4px 6px"><span style="color:rgba(0,0,0,.45)">▤</span> default <div style="flex:1"></div><span style="color:rgba(0,0,0,.4);font-size:10px">⌃⌄</span></div>
+      <div style="display:flex;align-items:center;gap:9px;padding:4px 6px"><span style="width:7px;height:7px;border-radius:50%;background:#E0742E"></span><div style="display:grid;gap:1px"><div style="font-size:12.5px;font-weight:500">Local Hermes</div><div style="font-size:11px;color:rgba(0,0,0,.5)">Connected · 127.0.0.1:8642</div></div><div style="flex:1"></div><span style="color:rgba(0,0,0,.45)">≋</span></div>
+    </div>
+  </div>
+  <div style="position:relative;display:flex;flex-direction:column;min-width:0;background:rgba(255,255,255,.62)">
+    <!-- toolbar with Safari-style tabs -->
+    <div style="height:52px;display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid rgba(0,0,0,.06)">
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,.85);box-shadow:inset 0 1px 0 #fff,0 1px 3px rgba(0,0,0,.1);display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#E0742E;animation:tal-pulse 1.4s infinite"></span>Migrate billing worker<span style="color:rgba(0,0,0,.35);margin-left:6px;font-size:11px">✕</span></div>
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;font-size:12.5px;color:rgba(0,0,0,.6)">Draft release notes v0.9</div>
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px;font-size:12.5px;color:rgba(0,0,0,.6)">Weekly metrics digest<span style="width:6px;height:6px;border-radius:50%;background:#E0742E"></span></div>
+      <div style="width:32px;height:32px;flex:none;border-radius:16px;display:grid;place-items:center;color:rgba(0,0,0,.45);font-size:17px">+</div>
+      <div style="flex:1"></div>
+      <div style="width:30px;height:30px;flex:none;border-radius:15px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 2px rgba(0,0,0,.08);display:grid;place-items:center;color:rgba(0,0,0,.6);font-size:13px">⧉</div>
+    </div>
+    <div style="flex:1;overflow:hidden;padding:26px 36px 0;display:grid;gap:26px;align-content:start;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="display:flex;gap:10px;align-items:center;font-size:11.5px;color:rgba(0,0,0,.5)"><span style="width:6px;height:6px;border-radius:50%;background:#E0742E;animation:tal-pulse 1.4s infinite"></span>Working · 2m 14s<div style="flex:1"></div>talaria · main</div>
+      <div style="display:grid;gap:8px"><div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.5)">You</div><div style="font-size:13.5px;line-height:1.55">Port <code style="font:12px ui-monospace,Menlo,monospace;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px">billing_worker.py</code> to Swift, keep the retry semantics, and run the existing fixtures against it.</div></div>
+      <div style="display:grid;gap:12px">
+        <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.5);display:flex;gap:8px;align-items:center"><span style="width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#F0A05A,#E0742E)"></span>Hermes</div>
+        <div style="font-size:12px;color:rgba(0,0,0,.55);display:flex;gap:8px;align-items:center"><span style="font-size:10px">▸</span>Thought for 18s</div>
+        <div style="border:1px solid rgba(0,0,0,.08);border-radius:12px;background:rgba(255,255,255,.7);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#B85A1A">✓</span><span style="font-weight:600">read_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">billing/billing_worker.py</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">312 lines</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#B85A1A">✓</span><span style="font-weight:600">write_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">Sources/Billing/BillingWorker.swift</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">+298</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #E0742E;border-right-color:transparent"></span><span style="font-weight:600">terminal</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">swift test --filter BillingTests</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">running</span></div>
+          <div style="background:#1e1c1a;color:#e2ddd6;font:11.5px/1.6 ui-monospace,Menlo,monospace;padding:10px 14px;white-space:pre">Test Suite 'BillingTests' started
+  ✓ retriesTransientFailureThreeTimes (0.041s)
+  ✓ backoffIsExponentialWithJitter (0.012s)
+  ▸ idempotencyKeyIsStable…</div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.6">The Swift port keeps the three-attempt retry with exponential backoff and jitter. Two fixtures pass so far; I'm on the idempotency case now — the Python version derived the key from <code style="font:12px ui-monospace,Menlo,monospace;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px">invoice.id + attempt</code>, which I've preserved rather than switching to a UUID.<span style="display:inline-block;width:7px;height:14px;background:#E0742E;vertical-align:-2px;margin-left:2px;animation:tal-pulse 1s infinite"></span></div>
+      </div>
+    </div>
+    <div style="padding:14px 36px 18px;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="border-radius:26px;background:rgba(255,255,255,.55);backdrop-filter:blur(30px) saturate(1.6);border:1px solid rgba(255,255,255,.9);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 10px 30px rgba(40,25,10,.14);padding:14px 14px 10px;display:grid;gap:10px">
+        <div style="font-size:13.5px;color:rgba(0,0,0,.35);padding:2px 4px;min-height:36px">Message Hermes…</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(0,0,0,.6)">⌇</div>
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(0,0,0,.6)">···</div>
+          <div style="height:26px;padding:0 10px;border-radius:13px;background:rgba(0,0,0,.05);font-size:11.5px;display:flex;align-items:center;gap:6px;color:rgba(0,0,0,.65)">claude-sonnet-4.5 · High <span style="font-size:9px">▾</span></div>
+          <div style="flex:1"></div>
+          <div style="height:36px;padding:0 16px;border-radius:18px;background:#E0742E;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 6px rgba(224,116,46,.35);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600">■ Stop</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="background:rgba(255,255,255,.42);backdrop-filter:blur(40px) saturate(1.5);border-left:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;min-width:0">
+    <div style="height:52px;display:flex;align-items:center;padding:0 10px;gap:2px;border-bottom:1px solid rgba(0,0,0,.06)">
+      <div style="height:28px;padding:0 12px;border-radius:14px;background:rgba(255,255,255,.8);box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.08);font-size:12px;font-weight:600;display:flex;align-items:center">Files</div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(0,0,0,.55);display:flex;align-items:center">Review <span style="margin-left:5px;font-size:10px;font-weight:600;color:#B85A1A">2</span></div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(0,0,0,.55);display:flex;align-items:center">Terminal</div>
+    </div>
+    <div style="padding:10px 12px;font:12px/1.9 -apple-system,system-ui,sans-serif;color:#1a1c1a">
+      <div style="display:flex;gap:6px;align-items:center;font-weight:600"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> talaria</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> Sources</div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> Billing</div>
+      <div style="padding-left:54px;display:flex;gap:6px;align-items:center;background:rgba(224,116,46,.16);border-radius:6px;margin:0 -6px;padding-right:6px"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>BillingWorker.swift<div style="flex:1"></div><span style="font-size:10px;color:#B85A1A;font-weight:600">A</span></div>
+      <div style="padding-left:54px;display:flex;gap:6px;align-items:center"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>RetryPolicy.swift<div style="flex:1"></div><span style="font-size:10px;color:rgba(0,0,0,.5);font-weight:600;margin-right:6px">M</span></div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▸</span> HermesCore</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▸</span> Tests</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center;color:rgba(0,0,0,.6)"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>Package.swift</div>
+    </div>
+    <div style="margin:6px 12px 0;flex:1;border-radius:10px;background:rgba(255,255,255,.75);border:1px solid rgba(0,0,0,.07);overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:7px 10px;font-size:11px;color:rgba(0,0,0,.5);border-bottom:1px solid rgba(0,0,0,.06);display:flex;gap:8px">BillingWorker.swift <div style="flex:1"></div>L 41–58</div>
+      <div style="font:11px/1.65 ui-monospace,Menlo,monospace;padding:8px 10px;color:#2a2e2a;white-space:pre;overflow:hidden">func attempt(_ n: Int) async throws {
+  let delay = policy.backoff(n)
+  try await Task.sleep(for: delay)
+  <span style="background:rgba(224,116,46,.3)">let key = "\(invoice.id):\(n)"</span>
+  try await charge(key: key)
+}</div>
+    </div>
+    <div style="padding:12px;display:grid;gap:8px">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45)">Status</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#B85A1A">☑</span>Read Python worker</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#B85A1A">☑</span>Write Swift port</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #E0742E;border-right-color:transparent;margin:0 1px"></span>Run fixtures</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:rgba(0,0,0,.5)"><span>☐</span>Summarize diff</div>
+    </div>
+  </div>
+</div>
+</div></div>
+<!-- 2a-end -->
+<!-- 2b-start -->
+<div class="dv-opt" id="2b"><div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Blue · light</div>
+<div class="dv-card" style="width:1180px;height:760px;position:relative;background:linear-gradient(160deg,#dfe5ec 0%,#e4e6ea 45%,#e8e4e2 100%)" data-screen-label="2b Blue light">
+<div style="position:absolute;inset:0;display:grid;grid-template-columns:240px minmax(0,1fr) 290px">
+  <div style="background:rgba(255,255,255,.42);backdrop-filter:blur(40px) saturate(1.5);border-right:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 14px">
+      <span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span>
+      <div style="flex:1"></div>
+      <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 2px rgba(0,0,0,.08);display:grid;place-items:center;color:#1F5FB8;font-size:15px">✎</div>
+    </div>
+    <div style="margin:2px 12px 10px;height:28px;border-radius:8px;background:rgba(0,0,0,.05);display:flex;align-items:center;gap:6px;padding:0 9px;color:rgba(0,0,0,.4);font-size:12px">⌕ Find a conversation</div>
+    <div style="padding:0 8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow:hidden">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:8px 10px 4px">Today</div>
+      <div style="padding:8px 10px;border-radius:8px;background:rgba(59,125,221,.16);display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#1a1c1a">Migrate billing worker to Swift<div style="flex:1"></div><span style="width:7px;height:7px;border-radius:50%;background:#3B7DDD;animation:tal-pulse 1.4s infinite"></span></div><div style="font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Running tests in /Sources/Billing…</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="font-size:13px;font-weight:500">Draft release notes v0.9</div><div style="font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Pulled 41 commits since the last tag</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500">Weekly metrics digest<div style="flex:1"></div><span style="font-size:10px;color:#1F5FB8;font-weight:600">NEEDS YOU</span></div><div style="font-size:11.5px;color:rgba(0,0,0,.5)">Approve: read ~/Reports/*.csv</div></div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Yesterday</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Explain the gateway contract</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Photo library dedupe script</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">App icon variants</div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Projects</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(0,0,0,.18)"></span>talaria <span style="font-size:11px;color:rgba(0,0,0,.45)">main</span></div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(0,0,0,.18)"></span>hermes-agent <span style="font-size:11px;color:rgba(0,0,0,.45)">worktree/billing</span></div>
+    </div>
+    <div style="border-top:1px solid rgba(0,0,0,.07);padding:10px 12px;display:grid;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;padding:4px 6px"><span style="color:rgba(0,0,0,.45)">▤</span> default <div style="flex:1"></div><span style="color:rgba(0,0,0,.4);font-size:10px">⌃⌄</span></div>
+      <div style="display:flex;align-items:center;gap:9px;padding:4px 6px"><span style="width:7px;height:7px;border-radius:50%;background:#3B7DDD"></span><div style="display:grid;gap:1px"><div style="font-size:12.5px;font-weight:500">Local Hermes</div><div style="font-size:11px;color:rgba(0,0,0,.5)">Connected · 127.0.0.1:8642</div></div><div style="flex:1"></div><span style="color:rgba(0,0,0,.45)">≋</span></div>
+    </div>
+  </div>
+  <div style="position:relative;display:flex;flex-direction:column;min-width:0;background:rgba(255,255,255,.62)">
+    <!-- toolbar with Safari-style tabs -->
+    <div style="height:52px;display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid rgba(0,0,0,.06)">
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,.85);box-shadow:inset 0 1px 0 #fff,0 1px 3px rgba(0,0,0,.1);display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#3B7DDD;animation:tal-pulse 1.4s infinite"></span>Migrate billing worker<span style="color:rgba(0,0,0,.35);margin-left:6px;font-size:11px">✕</span></div>
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;font-size:12.5px;color:rgba(0,0,0,.6)">Draft release notes v0.9</div>
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px;font-size:12.5px;color:rgba(0,0,0,.6)">Weekly metrics digest<span style="width:6px;height:6px;border-radius:50%;background:#3B7DDD"></span></div>
+      <div style="width:32px;height:32px;flex:none;border-radius:16px;display:grid;place-items:center;color:rgba(0,0,0,.45);font-size:17px">+</div>
+      <div style="flex:1"></div>
+      <div style="width:30px;height:30px;flex:none;border-radius:15px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 2px rgba(0,0,0,.08);display:grid;place-items:center;color:rgba(0,0,0,.6);font-size:13px">⧉</div>
+    </div>
+    <div style="flex:1;overflow:hidden;padding:26px 36px 0;display:grid;gap:26px;align-content:start;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="display:flex;gap:10px;align-items:center;font-size:11.5px;color:rgba(0,0,0,.5)"><span style="width:6px;height:6px;border-radius:50%;background:#3B7DDD;animation:tal-pulse 1.4s infinite"></span>Working · 2m 14s<div style="flex:1"></div>talaria · main</div>
+      <div style="display:grid;gap:8px"><div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.5)">You</div><div style="font-size:13.5px;line-height:1.55">Port <code style="font:12px ui-monospace,Menlo,monospace;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px">billing_worker.py</code> to Swift, keep the retry semantics, and run the existing fixtures against it.</div></div>
+      <div style="display:grid;gap:12px">
+        <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.5);display:flex;gap:8px;align-items:center"><span style="width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#7FB0F0,#3B7DDD)"></span>Hermes</div>
+        <div style="font-size:12px;color:rgba(0,0,0,.55);display:flex;gap:8px;align-items:center"><span style="font-size:10px">▸</span>Thought for 18s</div>
+        <div style="border:1px solid rgba(0,0,0,.08);border-radius:12px;background:rgba(255,255,255,.7);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#1F5FB8">✓</span><span style="font-weight:600">read_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">billing/billing_worker.py</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">312 lines</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#1F5FB8">✓</span><span style="font-weight:600">write_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">Sources/Billing/BillingWorker.swift</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">+298</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #3B7DDD;border-right-color:transparent"></span><span style="font-weight:600">terminal</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">swift test --filter BillingTests</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">running</span></div>
+          <div style="background:#1a1c22;color:#d8dde6;font:11.5px/1.6 ui-monospace,Menlo,monospace;padding:10px 14px;white-space:pre">Test Suite 'BillingTests' started
+  ✓ retriesTransientFailureThreeTimes (0.041s)
+  ✓ backoffIsExponentialWithJitter (0.012s)
+  ▸ idempotencyKeyIsStable…</div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.6">The Swift port keeps the three-attempt retry with exponential backoff and jitter. Two fixtures pass so far; I'm on the idempotency case now — the Python version derived the key from <code style="font:12px ui-monospace,Menlo,monospace;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px">invoice.id + attempt</code>, which I've preserved rather than switching to a UUID.<span style="display:inline-block;width:7px;height:14px;background:#3B7DDD;vertical-align:-2px;margin-left:2px;animation:tal-pulse 1s infinite"></span></div>
+      </div>
+    </div>
+    <div style="padding:14px 36px 18px;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="border-radius:26px;background:rgba(255,255,255,.55);backdrop-filter:blur(30px) saturate(1.6);border:1px solid rgba(255,255,255,.9);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 10px 30px rgba(10,25,50,.14);padding:14px 14px 10px;display:grid;gap:10px">
+        <div style="font-size:13.5px;color:rgba(0,0,0,.35);padding:2px 4px;min-height:36px">Message Hermes…</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(0,0,0,.6)">⌇</div>
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(0,0,0,.6)">···</div>
+          <div style="height:26px;padding:0 10px;border-radius:13px;background:rgba(0,0,0,.05);font-size:11.5px;display:flex;align-items:center;gap:6px;color:rgba(0,0,0,.65)">claude-sonnet-4.5 · High <span style="font-size:9px">▾</span></div>
+          <div style="flex:1"></div>
+          <div style="height:36px;padding:0 16px;border-radius:18px;background:#3B7DDD;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 6px rgba(59,125,221,.35);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600">■ Stop</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="background:rgba(255,255,255,.42);backdrop-filter:blur(40px) saturate(1.5);border-left:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;min-width:0">
+    <div style="height:52px;display:flex;align-items:center;padding:0 10px;gap:2px;border-bottom:1px solid rgba(0,0,0,.06)">
+      <div style="height:28px;padding:0 12px;border-radius:14px;background:rgba(255,255,255,.8);box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.08);font-size:12px;font-weight:600;display:flex;align-items:center">Files</div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(0,0,0,.55);display:flex;align-items:center">Review <span style="margin-left:5px;font-size:10px;font-weight:600;color:#1F5FB8">2</span></div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(0,0,0,.55);display:flex;align-items:center">Terminal</div>
+    </div>
+    <div style="padding:10px 12px;font:12px/1.9 -apple-system,system-ui,sans-serif;color:#1a1c1a">
+      <div style="display:flex;gap:6px;align-items:center;font-weight:600"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> talaria</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> Sources</div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> Billing</div>
+      <div style="padding-left:54px;display:flex;gap:6px;align-items:center;background:rgba(59,125,221,.16);border-radius:6px;margin:0 -6px;padding-right:6px"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>BillingWorker.swift<div style="flex:1"></div><span style="font-size:10px;color:#1F5FB8;font-weight:600">A</span></div>
+      <div style="padding-left:54px;display:flex;gap:6px;align-items:center"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>RetryPolicy.swift<div style="flex:1"></div><span style="font-size:10px;color:rgba(0,0,0,.5);font-weight:600;margin-right:6px">M</span></div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▸</span> HermesCore</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▸</span> Tests</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center;color:rgba(0,0,0,.6)"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>Package.swift</div>
+    </div>
+    <div style="margin:6px 12px 0;flex:1;border-radius:10px;background:rgba(255,255,255,.75);border:1px solid rgba(0,0,0,.07);overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:7px 10px;font-size:11px;color:rgba(0,0,0,.5);border-bottom:1px solid rgba(0,0,0,.06);display:flex;gap:8px">BillingWorker.swift <div style="flex:1"></div>L 41–58</div>
+      <div style="font:11px/1.65 ui-monospace,Menlo,monospace;padding:8px 10px;color:#2a2e2a;white-space:pre;overflow:hidden">func attempt(_ n: Int) async throws {
+  let delay = policy.backoff(n)
+  try await Task.sleep(for: delay)
+  <span style="background:rgba(59,125,221,.3)">let key = "\(invoice.id):\(n)"</span>
+  try await charge(key: key)
+}</div>
+    </div>
+    <div style="padding:12px;display:grid;gap:8px">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45)">Status</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#1F5FB8">☑</span>Read Python worker</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#1F5FB8">☑</span>Write Swift port</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #3B7DDD;border-right-color:transparent;margin:0 1px"></span>Run fixtures</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:rgba(0,0,0,.5)"><span>☐</span>Summarize diff</div>
+    </div>
+  </div>
+</div>
+</div></div>
+<!-- 2b-end -->
+<!-- 2c-start -->
+<div class="dv-opt" id="2c"><div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Purple · dark</div>
+<div class="dv-card" style="width:1180px;height:760px;position:relative;background:radial-gradient(800px 500px at 15% 0%,#2a2340 0%,transparent 60%),radial-gradient(700px 500px at 100% 100%,#1c2438 0%,transparent 60%),#15151a" data-screen-label="2c Purple dark">
+<div style="position:absolute;inset:0;display:grid;grid-template-columns:240px minmax(0,1fr) 290px">
+  <div style="background:rgba(255,255,255,.04);backdrop-filter:blur(40px) saturate(1.5);border-right:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 14px">
+      <span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span>
+      <div style="flex:1"></div>
+      <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);display:grid;place-items:center;color:#B9A3FF;font-size:15px">✎</div>
+    </div>
+    <div style="margin:2px 12px 10px;height:28px;border-radius:8px;background:rgba(255,255,255,.07);display:flex;align-items:center;gap:6px;padding:0 9px;color:rgba(255,255,255,.4);font-size:12px">⌕ Find a conversation</div>
+    <div style="padding:0 8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow:hidden">
+      <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.45);padding:8px 10px 4px">Today</div>
+      <div style="padding:8px 10px;border-radius:8px;background:rgba(155,123,245,.16);display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#ecebf2">Migrate billing worker to Swift<div style="flex:1"></div><span style="width:7px;height:7px;border-radius:50%;background:#9B7BF5;animation:tal-pulse 1.4s infinite"></span></div><div style="font-size:11.5px;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Running tests in /Sources/Billing…</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="font-size:13px;font-weight:500">Draft release notes v0.9</div><div style="font-size:11.5px;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Pulled 41 commits since the last tag</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500">Weekly metrics digest<div style="flex:1"></div><span style="font-size:10px;color:#B9A3FF;font-weight:600">NEEDS YOU</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.5)">Approve: read ~/Reports/*.csv</div></div>
+      <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.45);padding:12px 10px 4px">Yesterday</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Explain the gateway contract</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Photo library dedupe script</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">App icon variants</div>
+      <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.45);padding:12px 10px 4px">Projects</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(255,255,255,.25)"></span>talaria <span style="font-size:11px;color:rgba(255,255,255,.45)">main</span></div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(255,255,255,.25)"></span>hermes-agent <span style="font-size:11px;color:rgba(255,255,255,.45)">worktree/billing</span></div>
+    </div>
+    <div style="border-top:1px solid rgba(255,255,255,.07);padding:10px 12px;display:grid;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;padding:4px 6px"><span style="color:rgba(255,255,255,.45)">▤</span> default <div style="flex:1"></div><span style="color:rgba(255,255,255,.4);font-size:10px">⌃⌄</span></div>
+      <div style="display:flex;align-items:center;gap:9px;padding:4px 6px"><span style="width:7px;height:7px;border-radius:50%;background:#9B7BF5"></span><div style="display:grid;gap:1px"><div style="font-size:12.5px;font-weight:500">Local Hermes</div><div style="font-size:11px;color:rgba(255,255,255,.5)">Connected · 127.0.0.1:8642</div></div><div style="flex:1"></div><span style="color:rgba(255,255,255,.45)">≋</span></div>
+    </div>
+  </div>
+  <div style="position:relative;display:flex;flex-direction:column;min-width:0;background:rgba(255,255,255,.025);color:#ecebf2">
+    <!-- toolbar with Safari-style tabs -->
+    <div style="height:52px;display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid rgba(255,255,255,.07)">
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#9B7BF5;animation:tal-pulse 1.4s infinite"></span>Migrate billing worker<span style="color:rgba(255,255,255,.35);margin-left:6px;font-size:11px">✕</span></div>
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;font-size:12.5px;color:rgba(255,255,255,.65)">Draft release notes v0.9</div>
+      <div style="height:32px;padding:0 12px;border-radius:16px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px;font-size:12.5px;color:rgba(255,255,255,.65)">Weekly metrics digest<span style="width:6px;height:6px;border-radius:50%;background:#9B7BF5"></span></div>
+      <div style="width:32px;height:32px;flex:none;border-radius:16px;display:grid;place-items:center;color:rgba(255,255,255,.45);font-size:17px">+</div>
+      <div style="flex:1"></div>
+      <div style="width:30px;height:30px;flex:none;border-radius:15px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);display:grid;place-items:center;color:rgba(255,255,255,.65);font-size:13px">⧉</div>
+    </div>
+    <div style="flex:1;overflow:hidden;padding:26px 36px 0;display:grid;gap:26px;align-content:start;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="display:flex;gap:10px;align-items:center;font-size:11.5px;color:rgba(255,255,255,.5)"><span style="width:6px;height:6px;border-radius:50%;background:#9B7BF5;animation:tal-pulse 1.4s infinite"></span>Working · 2m 14s<div style="flex:1"></div>talaria · main</div>
+      <div style="display:grid;gap:8px"><div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.5)">You</div><div style="font-size:13.5px;line-height:1.55">Port <code style="font:12px ui-monospace,Menlo,monospace;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:4px">billing_worker.py</code> to Swift, keep the retry semantics, and run the existing fixtures against it.</div></div>
+      <div style="display:grid;gap:12px">
+        <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.5);display:flex;gap:8px;align-items:center"><span style="width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#C9B8FF,#9B7BF5)"></span>Hermes</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.55);display:flex;gap:8px;align-items:center"><span style="font-size:10px">▸</span>Thought for 18s</div>
+        <div style="border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.05);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.07)"><span style="color:#B9A3FF">✓</span><span style="font-weight:600">read_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(255,255,255,.65)">billing/billing_worker.py</span><div style="flex:1"></div><span style="color:rgba(255,255,255,.4)">312 lines</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.07)"><span style="color:#B9A3FF">✓</span><span style="font-weight:600">write_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(255,255,255,.65)">Sources/Billing/BillingWorker.swift</span><div style="flex:1"></div><span style="color:rgba(255,255,255,.4)">+298</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #9B7BF5;border-right-color:transparent"></span><span style="font-weight:600">terminal</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(255,255,255,.65)">swift test --filter BillingTests</span><div style="flex:1"></div><span style="color:rgba(255,255,255,.4)">running</span></div>
+          <div style="background:#0e0d14;color:#d8d4e6;font:11.5px/1.6 ui-monospace,Menlo,monospace;padding:10px 14px;white-space:pre">Test Suite 'BillingTests' started
+  ✓ retriesTransientFailureThreeTimes (0.041s)
+  ✓ backoffIsExponentialWithJitter (0.012s)
+  ▸ idempotencyKeyIsStable…</div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.6">The Swift port keeps the three-attempt retry with exponential backoff and jitter. Two fixtures pass so far; I'm on the idempotency case now — the Python version derived the key from <code style="font:12px ui-monospace,Menlo,monospace;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:4px">invoice.id + attempt</code>, which I've preserved rather than switching to a UUID.<span style="display:inline-block;width:7px;height:14px;background:#9B7BF5;vertical-align:-2px;margin-left:2px;animation:tal-pulse 1s infinite"></span></div>
+      </div>
+    </div>
+    <div style="padding:14px 36px 18px;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="border-radius:26px;background:rgba(255,255,255,.07);backdrop-filter:blur(30px) saturate(1.4);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 10px 30px rgba(0,0,0,.45);padding:14px 14px 10px;display:grid;gap:10px">
+        <div style="font-size:13.5px;color:rgba(255,255,255,.35);padding:2px 4px;min-height:36px">Message Hermes…</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(255,255,255,.65)">⌇</div>
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(255,255,255,.65)">···</div>
+          <div style="height:26px;padding:0 10px;border-radius:13px;background:rgba(255,255,255,.08);font-size:11.5px;display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.7)">claude-sonnet-4.5 · High <span style="font-size:9px">▾</span></div>
+          <div style="flex:1"></div>
+          <div style="height:36px;padding:0 16px;border-radius:18px;background:#9B7BF5;color:#15151a;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 6px rgba(155,123,245,.35);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600">■ Stop</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="background:rgba(255,255,255,.04);backdrop-filter:blur(40px) saturate(1.5);border-left:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;min-width:0">
+    <div style="height:52px;display:flex;align-items:center;padding:0 10px;gap:2px;border-bottom:1px solid rgba(255,255,255,.07)">
+      <div style="height:28px;padding:0 12px;border-radius:14px;background:rgba(255,255,255,.12);font-size:12px;font-weight:600;display:flex;align-items:center">Files</div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(255,255,255,.55);display:flex;align-items:center">Review <span style="margin-left:5px;font-size:10px;font-weight:600;color:#B9A3FF">2</span></div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(255,255,255,.55);display:flex;align-items:center">Terminal</div>
+    </div>
+    <div style="padding:10px 12px;font:12px/1.9 -apple-system,system-ui,sans-serif;color:#ecebf2">
+      <div style="display:flex;gap:6px;align-items:center;font-weight:600"><span style="font-size:9px;color:rgba(255,255,255,.45)">▾</span> talaria</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(255,255,255,.45)">▾</span> Sources</div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(255,255,255,.45)">▾</span> Billing</div>
+      <div style="padding-left:54px;display:flex;gap:6px;align-items:center;background:rgba(155,123,245,.16);border-radius:6px;margin:0 -6px;padding-right:6px"><span style="width:9px;height:11px;border:1px solid rgba(255,255,255,.4);border-radius:2px"></span>BillingWorker.swift<div style="flex:1"></div><span style="font-size:10px;color:#B9A3FF;font-weight:600">A</span></div>
+      <div style="padding-left:54px;display:flex;gap:6px;align-items:center"><span style="width:9px;height:11px;border:1px solid rgba(255,255,255,.4);border-radius:2px"></span>RetryPolicy.swift<div style="flex:1"></div><span style="font-size:10px;color:rgba(255,255,255,.5);font-weight:600;margin-right:6px">M</span></div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(255,255,255,.45)">▸</span> HermesCore</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(255,255,255,.45)">▸</span> Tests</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center;color:rgba(255,255,255,.65)"><span style="width:9px;height:11px;border:1px solid rgba(255,255,255,.4);border-radius:2px"></span>Package.swift</div>
+    </div>
+    <div style="margin:6px 12px 0;flex:1;border-radius:10px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.07);overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:7px 10px;font-size:11px;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);display:flex;gap:8px">BillingWorker.swift <div style="flex:1"></div>L 41–58</div>
+      <div style="font:11px/1.65 ui-monospace,Menlo,monospace;padding:8px 10px;color:rgba(255,255,255,.8);white-space:pre;overflow:hidden">func attempt(_ n: Int) async throws {
+  let delay = policy.backoff(n)
+  try await Task.sleep(for: delay)
+  <span style="background:rgba(155,123,245,.3)">let key = "\(invoice.id):\(n)"</span>
+  try await charge(key: key)
+}</div>
+    </div>
+    <div style="padding:12px;display:grid;gap:8px">
+      <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.45)">Status</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#B9A3FF">☑</span>Read Python worker</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#B9A3FF">☑</span>Write Swift port</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #9B7BF5;border-right-color:transparent;margin:0 1px"></span>Run fixtures</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:rgba(255,255,255,.5)"><span>☐</span>Summarize diff</div>
+    </div>
+  </div>
+</div>
+</div></div>
+<!-- 2c-end -->
+</div>
+<p class="dv-next">Try next: "go with <a class="dv-oid" href="#2b">2b</a>, now do Skills, Cron, Kanban, Settings, Onboarding" · "<a class="dv-oid" href="#2a">2a</a> in dark" · "warmer neutrals behind <a class="dv-oid" href="#2c">2c</a>"</p>
+</section>
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Talaria for Mac — three window structures for the chat workspace</span></div>
+<div style="max-width:880px;margin:0 0 28px;padding:18px 20px;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:10px;font-size:12.5px;line-height:1.55;color:#3a3d3a;display:grid;gap:8px">
+<div><strong style="color:#1a1c1a">Context from the repo (howhowdg/talaria).</strong> Palette: Volt <span style="display:inline-block;width:10px;height:10px;background:#CEFA45;border-radius:3px;vertical-align:-1px;border:1px solid rgba(0,0,0,.1)"></span> #CEFA45 for prominent fills with Graphite #181E17 text; Deep green #3F5B0A as light-mode accent; volt as dark-mode accent. Brand rule: keep Liquid Glass in the <em>control layer</em> (toolbars, buttons, floating composer) and quiet surfaces behind messages. Existing UI is a NavigationSplitView with sidebar → sessions, capsule glass buttons, a 26pt-radius glass composer.</div>
+<div><strong style="color:#1a1c1a">Assumptions.</strong> Screens are 1180×760 Mac windows, system font, 13px body. Tool cards come from the desktop audit (grouped tools, reasoning disclosure with timer, approval stack, status stack: todos / background processes / subagents). Icons are placeholders — SF Symbols in the build.</div>
+<div><strong style="color:#1a1c1a">Three directions.</strong> <a class="dv-oid" href="#1a">1a</a> stays inside the brand rule (glass only on controls). <a class="dv-oid" href="#1b">1b</a> adds Safari-style session tabs and a slide-in files panel — the most Hermes-Desktop-like. <a class="dv-oid" href="#1c">1c</a> pushes furthest: every region floats as a glass panel over the desktop wallpaper.</div>
+</div>
+<div class="dv-opts">
+
+<!-- ═══════════════ 1a · Classic three column · light ═══════════════ -->
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Classic · sidebar · chat · inspector — light, glass on controls only</div>
+<div class="dv-card" style="width:1180px;height:760px;position:relative;background:linear-gradient(160deg,#dfe6e2 0%,#e9e6dc 45%,#d9dde6 100%)" data-screen-label="1a Classic light">
+<!-- window: three columns -->
+<div style="position:absolute;inset:0;display:grid;grid-template-columns:260px minmax(0,1fr) 300px">
+  <!-- sidebar -->
+  <div style="background:rgba(255,255,255,.42);backdrop-filter:blur(40px) saturate(1.5);border-right:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 14px">
+      <span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span>
+      <div style="flex:1"></div>
+      <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 2px rgba(0,0,0,.08);display:grid;place-items:center;color:#3F5B0A;font-size:15px">✎</div>
+    </div>
+    <div style="margin:2px 12px 10px;height:28px;border-radius:8px;background:rgba(0,0,0,.05);display:flex;align-items:center;gap:6px;padding:0 9px;color:rgba(0,0,0,.4);font-size:12px">⌕ Find a conversation</div>
+    <div style="padding:0 8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow:hidden">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:8px 10px 4px">Today</div>
+      <div style="padding:8px 10px;border-radius:8px;background:rgba(63,91,10,.13);display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#1a1c1a">Migrate billing worker to Swift<div style="flex:1"></div><span style="width:7px;height:7px;border-radius:50%;background:#3F5B0A;animation:tal-pulse 1.4s infinite"></span></div><div style="font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Running tests in /Sources/Billing…</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="font-size:13px;font-weight:500">Draft release notes v0.9</div><div style="font-size:11.5px;color:rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Pulled 41 commits since the last tag</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:3px"><div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500">Weekly metrics digest<div style="flex:1"></div><span style="font-size:10px;color:#3F5B0A;font-weight:600">NEEDS YOU</span></div><div style="font-size:11.5px;color:rgba(0,0,0,.5)">Approve: read ~/Reports/*.csv</div></div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Yesterday</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Explain the gateway contract</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Photo library dedupe script</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500">Talaria icon variants</div>
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45);padding:12px 10px 4px">Projects</div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(0,0,0,.18)"></span>talaria <span style="font-size:11px;color:rgba(0,0,0,.45)">main</span></div>
+      <div style="padding:7px 10px;font-size:13px;display:flex;gap:8px;align-items:center"><span style="width:14px;height:11px;border-radius:3px;background:rgba(0,0,0,.18)"></span>hermes-agent <span style="font-size:11px;color:rgba(0,0,0,.45)">worktree/billing</span></div>
+    </div>
+    <div style="border-top:1px solid rgba(0,0,0,.07);padding:10px 12px;display:grid;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;padding:4px 6px"><span style="color:rgba(0,0,0,.45)">▤</span> default <div style="flex:1"></div><span style="color:rgba(0,0,0,.4);font-size:10px">⌃⌄</span></div>
+      <div style="display:flex;align-items:center;gap:9px;padding:4px 6px"><span style="width:7px;height:7px;border-radius:50%;background:#3F5B0A"></span><div style="display:grid;gap:1px"><div style="font-size:12.5px;font-weight:500">Local Hermes</div><div style="font-size:11px;color:rgba(0,0,0,.5)">Connected · 127.0.0.1:8642</div></div><div style="flex:1"></div><span style="color:rgba(0,0,0,.45)">≋</span></div>
+    </div>
+  </div>
+  <!-- chat -->
+  <div style="position:relative;display:flex;flex-direction:column;min-width:0;background:rgba(255,255,255,.62)">
+    <div style="height:52px;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.06)">
+      <div style="font-size:14px;font-weight:600">Migrate billing worker to Swift</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:rgba(0,0,0,.5)"><span style="width:6px;height:6px;border-radius:50%;background:#3F5B0A;animation:tal-pulse 1.4s infinite"></span>Working · 2m 14s</div>
+      <div style="flex:1"></div>
+      <div style="height:30px;padding:0 12px;border-radius:15px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 2px rgba(0,0,0,.08);display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500">claude-sonnet-4.5 <span style="color:rgba(0,0,0,.4);font-size:10px">▾</span></div>
+      <div style="width:30px;height:30px;border-radius:15px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 2px rgba(0,0,0,.08);display:grid;place-items:center;color:rgba(0,0,0,.6);font-size:13px">⌥</div>
+    </div>
+    <div style="flex:1;overflow:hidden;padding:26px 36px 0;display:grid;gap:26px;align-content:start;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="display:grid;gap:8px"><div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.5)">You</div><div style="font-size:13.5px;line-height:1.55">Port <code style="font:12px ui-monospace,Menlo,monospace;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px">billing_worker.py</code> to Swift, keep the retry semantics, and run the existing fixtures against it.</div></div>
+      <div style="display:grid;gap:12px">
+        <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.5);display:flex;gap:8px;align-items:center"><span style="width:14px;height:14px;background:#3F5B0A;-webkit-mask:url(Design/Brand/talaria-wing.png) center/contain no-repeat;mask:url(Design/Brand/talaria-wing.png) center/contain no-repeat"></span>Hermes</div>
+        <div style="font-size:12px;color:rgba(0,0,0,.55);display:flex;gap:8px;align-items:center"><span style="font-size:10px">▸</span>Thought for 18s</div>
+        <div style="border:1px solid rgba(0,0,0,.08);border-radius:12px;background:rgba(255,255,255,.7);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#3F5B0A">✓</span><span style="font-weight:600">read_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">billing/billing_worker.py</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">312 lines</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(0,0,0,.06)"><span style="color:#3F5B0A">✓</span><span style="font-weight:600">write_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">Sources/Billing/BillingWorker.swift</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">+298</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:12px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #3F5B0A;border-right-color:transparent"></span><span style="font-weight:600">terminal</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(0,0,0,.6)">swift test --filter BillingTests</span><div style="flex:1"></div><span style="color:rgba(0,0,0,.4)">running</span></div>
+          <div style="background:#181E17;color:#d7dccf;font:11.5px/1.6 ui-monospace,Menlo,monospace;padding:10px 14px;white-space:pre">Test Suite 'BillingTests' started
+  ✓ retriesTransientFailureThreeTimes (0.041s)
+  ✓ backoffIsExponentialWithJitter (0.012s)
+  ▸ idempotencyKeyIsStable…</div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.6">The Swift port keeps the three-attempt retry with exponential backoff and jitter. Two fixtures pass so far; I'm on the idempotency case now — the Python version derived the key from <code style="font:12px ui-monospace,Menlo,monospace;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px">invoice.id + attempt</code>, which I've preserved rather than switching to a UUID.<span style="display:inline-block;width:7px;height:14px;background:#3F5B0A;vertical-align:-2px;margin-left:2px;animation:tal-pulse 1s infinite"></span></div>
+      </div>
+    </div>
+    <!-- glass composer -->
+    <div style="padding:14px 36px 18px;max-width:760px;width:100%;box-sizing:border-box;margin:0 auto">
+      <div style="border-radius:26px;background:rgba(255,255,255,.55);backdrop-filter:blur(30px) saturate(1.6);border:1px solid rgba(255,255,255,.9);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 10px 30px rgba(20,30,10,.14);padding:14px 14px 10px;display:grid;gap:10px">
+        <div style="font-size:13.5px;color:rgba(0,0,0,.35);padding:2px 4px;min-height:36px">Message Hermes…</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(0,0,0,.6)">⌇</div>
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(0,0,0,.6)">···</div>
+          <div style="height:26px;padding:0 10px;border-radius:13px;background:rgba(0,0,0,.05);font-size:11.5px;display:flex;align-items:center;gap:6px;color:rgba(0,0,0,.65)">Reasoning · High <span style="font-size:9px">▾</span></div>
+          <div style="flex:1"></div>
+          <div style="height:36px;padding:0 16px;border-radius:18px;background:rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,1),0 1px 3px rgba(0,0,0,.1);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600">■ Stop</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- inspector -->
+  <div style="background:rgba(255,255,255,.42);backdrop-filter:blur(40px) saturate(1.5);border-left:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;min-width:0">
+    <div style="height:52px;display:flex;align-items:center;padding:0 10px;gap:2px;border-bottom:1px solid rgba(0,0,0,.06)">
+      <div style="height:28px;padding:0 12px;border-radius:14px;background:rgba(255,255,255,.8);box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.08);font-size:12px;font-weight:600;display:flex;align-items:center">Files</div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(0,0,0,.55);display:flex;align-items:center">Review <span style="margin-left:5px;font-size:10px;font-weight:600;color:#3F5B0A">2</span></div>
+      <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(0,0,0,.55);display:flex;align-items:center">Terminal</div>
+    </div>
+    <div style="padding:10px 12px;font:12px/1.9 -apple-system,system-ui,sans-serif;color:#1a1c1a">
+      <div style="display:flex;gap:6px;align-items:center;font-weight:600"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> talaria</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> Sources</div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▾</span> Billing</div>
+      <div style="padding-left:54px;display:flex;gap:6px;align-items:center;background:rgba(63,91,10,.13);border-radius:6px;margin:0 -6px;padding-right:6px"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>BillingWorker.swift<div style="flex:1"></div><span style="font-size:10px;color:#3F5B0A;font-weight:600">A</span></div>
+      <div style="padding-left:54px;display:flex;gap:6px;align-items:center"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>RetryPolicy.swift<div style="flex:1"></div><span style="font-size:10px;color:#a56b00;font-weight:600;margin-right:6px">M</span></div>
+      <div style="padding-left:36px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▸</span> HermesCore</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(0,0,0,.45)">▸</span> Tests</div>
+      <div style="padding-left:18px;display:flex;gap:6px;align-items:center;color:rgba(0,0,0,.6)"><span style="width:9px;height:11px;border:1px solid rgba(0,0,0,.35);border-radius:2px"></span>Package.swift</div>
+    </div>
+    <div style="margin:6px 12px 0;flex:1;border-radius:10px;background:rgba(255,255,255,.75);border:1px solid rgba(0,0,0,.07);overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:7px 10px;font-size:11px;color:rgba(0,0,0,.5);border-bottom:1px solid rgba(0,0,0,.06);display:flex;gap:8px">BillingWorker.swift <div style="flex:1"></div>L 41–58</div>
+      <div style="font:11px/1.65 ui-monospace,Menlo,monospace;padding:8px 10px;color:#2a2e2a;white-space:pre;overflow:hidden">func attempt(_ n: Int) async throws {
+  let delay = policy.backoff(n)
+  try await Task.sleep(for: delay)
+  <span style="background:rgba(206,250,69,.45)">let key = "\(invoice.id):\(n)"</span>
+  try await charge(key: key)
+}</div>
+    </div>
+    <div style="padding:12px;display:grid;gap:8px">
+      <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.45)">Status</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#3F5B0A">☑</span>Read Python worker</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px"><span style="color:#3F5B0A">☑</span>Write Swift port</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #3F5B0A;border-right-color:transparent;margin:0 1px"></span>Run fixtures</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:rgba(0,0,0,.5)"><span>☐</span>Summarize diff</div>
+    </div>
+  </div>
+</div>
+</div></div>
+
+<!-- ═══════════════ 1b · Tabbed chat-first · dark ═══════════════ -->
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Chat-first · Safari-style session tabs · files slide in as a glass sheet — dark</div>
+<div class="dv-card" style="width:1180px;height:760px;position:relative;background:radial-gradient(900px 500px at 20% 0%,#2b3a2e 0%,transparent 60%),radial-gradient(700px 500px at 100% 100%,#1f2a3a 0%,transparent 60%),#141614;color:#e8ebe6" data-screen-label="1b Tabbed dark">
+<div style="position:absolute;inset:0;display:grid;grid-template-columns:232px minmax(0,1fr)">
+  <!-- sidebar -->
+  <div style="background:rgba(255,255,255,.04);backdrop-filter:blur(40px);border-right:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column">
+    <div style="height:44px;display:flex;align-items:center;gap:8px;padding:0 14px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span></div>
+    <div style="padding:4px 12px 8px;display:flex;gap:6px">
+      <div style="flex:1;height:30px;border-radius:15px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:6px;padding:0 11px;color:rgba(255,255,255,.4);font-size:12px">⌕ Search</div>
+      <div style="width:30px;height:30px;border-radius:15px;background:#CEFA45;color:#181E17;display:grid;place-items:center;font-weight:700;font-size:16px;line-height:1">+</div>
+    </div>
+    <div style="padding:0 8px;display:flex;flex-direction:column;gap:1px;flex:1">
+      <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.4);padding:8px 10px 4px">Pinned</div>
+      <div style="padding:8px 10px;border-radius:8px;display:flex;gap:8px;align-items:center;font-size:13px"><span style="width:8px;height:8px;border-radius:50%;background:#CEFA45"></span>Bot Chat</div>
+      <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.4);padding:10px 10px 4px">Recent</div>
+      <div style="padding:8px 10px;border-radius:8px;background:rgba(206,250,69,.14);display:grid;gap:2px"><div style="display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600">Migrate billing worker<div style="flex:1"></div><span style="width:7px;height:7px;border-radius:50%;background:#CEFA45;animation:tal-pulse 1.4s infinite"></span></div><div style="font-size:11.5px;color:rgba(255,255,255,.5)">talaria · main</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:2px"><div style="font-size:13px">Draft release notes v0.9</div><div style="font-size:11.5px;color:rgba(255,255,255,.5)">talaria · main</div></div>
+      <div style="padding:8px 10px;border-radius:8px;display:grid;gap:2px"><div style="display:flex;gap:6px;align-items:center;font-size:13px">Weekly metrics digest<div style="flex:1"></div><span style="font-size:13px;color:#CEFA45">✋</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.5)">reports</div></div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px">Explain the gateway contract</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px">Photo library dedupe script</div>
+      <div style="padding:8px 10px;border-radius:8px;font-size:13px;color:rgba(255,255,255,.75)">Talaria icon variants</div>
+    </div>
+    <div style="padding:8px;display:grid;gap:1px;border-top:1px solid rgba(255,255,255,.07)">
+      <div style="padding:7px 10px;font-size:12.5px;color:rgba(255,255,255,.75);display:flex;gap:9px;align-items:center"><span style="width:14px;text-align:center">✦</span>Skills</div>
+      <div style="padding:7px 10px;font-size:12.5px;color:rgba(255,255,255,.75);display:flex;gap:9px;align-items:center"><span style="width:14px;text-align:center">◷</span>Cron</div>
+      <div style="padding:7px 10px;font-size:12.5px;color:rgba(255,255,255,.75);display:flex;gap:9px;align-items:center"><span style="width:14px;text-align:center">▦</span>Kanban</div>
+      <div style="padding:7px 10px;font-size:12.5px;color:rgba(255,255,255,.75);display:flex;gap:9px;align-items:center"><span style="width:14px;text-align:center">⚙</span>Settings</div>
+      <div style="margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.06);display:flex;gap:9px;align-items:center"><span style="width:7px;height:7px;border-radius:50%;background:#CEFA45"></span><div style="display:grid;gap:1px"><div style="font-size:12.5px;font-weight:500">default · Local Hermes</div><div style="font-size:11px;color:rgba(255,255,255,.5)">Connected</div></div></div>
+    </div>
+  </div>
+  <!-- main -->
+  <div style="position:relative;display:flex;flex-direction:column;min-width:0">
+    <!-- tab strip -->
+    <div style="height:44px;display:flex;align-items:center;gap:6px;padding:0 12px;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03)">
+      <div style="height:30px;padding:0 14px;border-radius:15px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#CEFA45;animation:tal-pulse 1.4s infinite"></span>Migrate billing worker<span style="color:rgba(255,255,255,.4);margin-left:4px;font-size:11px">✕</span></div>
+      <div style="height:30px;padding:0 14px;border-radius:15px;display:flex;align-items:center;gap:8px;font-size:12.5px;color:rgba(255,255,255,.6)">Draft release notes v0.9</div>
+      <div style="height:30px;padding:0 14px;border-radius:15px;display:flex;align-items:center;gap:8px;font-size:12.5px;color:rgba(255,255,255,.6)">Weekly metrics digest <span style="color:#CEFA45">✋</span></div>
+      <div style="width:30px;height:30px;border-radius:15px;display:grid;place-items:center;color:rgba(255,255,255,.5);font-size:16px">+</div>
+      <div style="flex:1"></div>
+      <div style="height:30px;padding:0 4px 0 12px;border-radius:15px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:8px;font-size:12px"><span style="color:rgba(255,255,255,.6)">Files</span><span style="height:22px;padding:0 9px;border-radius:11px;background:#CEFA45;color:#181E17;font-weight:600;display:flex;align-items:center">Open</span></div>
+      <div style="width:30px;height:30px;border-radius:15px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);display:grid;place-items:center;color:rgba(255,255,255,.7);font-size:13px">▯</div>
+    </div>
+    <!-- transcript -->
+    <div style="flex:1;overflow:hidden;padding:28px 40px 0;display:grid;gap:24px;align-content:start;max-width:600px;width:100%;box-sizing:border-box;margin:0 auto 0 0">
+      <div style="justify-self:end;max-width:78%;padding:10px 14px;border-radius:16px 16px 4px 16px;background:rgba(255,255,255,.1);font-size:13.5px;line-height:1.5">Port <code style="font:12px ui-monospace,Menlo,monospace;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:4px">billing_worker.py</code> to Swift, keep the retry semantics, run the fixtures.</div>
+      <div style="display:grid;gap:12px">
+        <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:rgba(255,255,255,.55)"><img src="Design/Brand/talaria-wing.png" alt="" style="width:16px;height:16px;object-fit:contain">Thought for 18s <span style="font-size:10px">▸</span></div>
+        <div style="display:grid;gap:6px">
+          <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 12px;border-radius:17px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-size:12px"><span style="color:#CEFA45">✓</span><span style="font-weight:600">read_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(255,255,255,.6)">billing/billing_worker.py</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 12px;border-radius:17px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-size:12px"><span style="color:#CEFA45">✓</span><span style="font-weight:600">write_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(255,255,255,.6)">Sources/Billing/BillingWorker.swift</span><div style="flex:1"></div><span style="color:#CEFA45;font-size:11px">+298</span></div>
+          <div style="border-radius:17px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);overflow:hidden"><div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 12px;font-size:12px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #CEFA45;border-right-color:transparent"></span><span style="font-weight:600">terminal</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(255,255,255,.6)">swift test --filter BillingTests</span></div><div style="padding:8px 14px 12px;font:11.5px/1.6 ui-monospace,Menlo,monospace;color:rgba(255,255,255,.7);white-space:pre">✓ retriesTransientFailureThreeTimes
+✓ backoffIsExponentialWithJitter
+▸ idempotencyKeyIsStable…</div></div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.6;color:#e8ebe6">Retry semantics preserved — three attempts, exponential backoff with jitter. Two fixtures green; working through idempotency now.<span style="display:inline-block;width:7px;height:14px;background:#CEFA45;vertical-align:-2px;margin-left:2px;animation:tal-pulse 1s infinite"></span></div>
+      </div>
+    </div>
+    <div style="padding:14px 40px 18px;max-width:600px;width:100%;box-sizing:border-box;margin:0 auto 0 0">
+      <div style="border-radius:26px;background:rgba(255,255,255,.08);backdrop-filter:blur(30px) saturate(1.4);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 10px 40px rgba(0,0,0,.4);padding:14px 14px 10px;display:grid;gap:10px">
+        <div style="font-size:13.5px;color:rgba(255,255,255,.35);padding:2px 4px;min-height:36px">Steer or queue a message…</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(255,255,255,.6)">⌇</div>
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(255,255,255,.6)">@</div>
+          <div style="height:26px;padding:0 10px;border-radius:13px;background:rgba(255,255,255,.08);font-size:11.5px;display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.7)">claude-sonnet-4.5 · High <span style="font-size:9px">▾</span></div>
+          <div style="flex:1"></div>
+          <div style="height:36px;padding:0 16px;border-radius:18px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600">■ Stop</div>
+        </div>
+      </div>
+    </div>
+    <!-- slide-in files sheet -->
+    <div style="position:absolute;top:56px;right:12px;bottom:12px;width:330px;border-radius:18px;background:rgba(28,31,28,.7);backdrop-filter:blur(40px) saturate(1.5);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 24px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;overflow:hidden">
+      <div style="height:44px;display:flex;align-items:center;padding:0 8px 0 14px;gap:4px;border-bottom:1px solid rgba(255,255,255,.08)">
+        <div style="height:26px;padding:0 11px;border-radius:13px;background:rgba(255,255,255,.14);font-size:12px;font-weight:600;display:flex;align-items:center">Files</div>
+        <div style="height:26px;padding:0 11px;font-size:12px;color:rgba(255,255,255,.55);display:flex;align-items:center">Review <span style="margin-left:5px;color:#CEFA45;font-weight:600">2</span></div>
+        <div style="height:26px;padding:0 11px;font-size:12px;color:rgba(255,255,255,.55);display:flex;align-items:center">Terminal</div>
+        <div style="flex:1"></div><div style="width:26px;height:26px;display:grid;place-items:center;color:rgba(255,255,255,.5);font-size:12px">✕</div>
+      </div>
+      <div style="padding:8px 12px;font:12px/1.9 -apple-system,system-ui,sans-serif">
+        <div style="display:flex;gap:6px;align-items:center;font-weight:600"><span style="font-size:9px;color:rgba(255,255,255,.4)">▾</span> talaria</div>
+        <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(255,255,255,.4)">▾</span> Sources / Billing</div>
+        <div style="padding-left:36px;display:flex;gap:6px;align-items:center;background:rgba(206,250,69,.16);border-radius:6px;margin:0 -6px;padding-right:6px"><span style="width:9px;height:11px;border:1px solid rgba(255,255,255,.4);border-radius:2px"></span>BillingWorker.swift<div style="flex:1"></div><span style="font-size:10px;color:#CEFA45;font-weight:600">A</span></div>
+        <div style="padding-left:36px;display:flex;gap:6px;align-items:center;color:rgba(255,255,255,.8)"><span style="width:9px;height:11px;border:1px solid rgba(255,255,255,.4);border-radius:2px"></span>RetryPolicy.swift<div style="flex:1"></div><span style="font-size:10px;color:#f2b84b;font-weight:600;margin-right:6px">M</span></div>
+        <div style="padding-left:18px;display:flex;gap:6px;align-items:center;color:rgba(255,255,255,.8)"><span style="font-size:9px;color:rgba(255,255,255,.4)">▸</span> Tests</div>
+      </div>
+      <div style="margin:4px 12px 12px;flex:1;border-radius:12px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.07);overflow:hidden;display:flex;flex-direction:column">
+        <div style="padding:7px 10px;font-size:11px;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);display:flex">BillingWorker.swift<div style="flex:1"></div>diff · +298</div>
+        <div style="font:11px/1.65 ui-monospace,Menlo,monospace;padding:8px 10px;color:rgba(255,255,255,.8);white-space:pre;overflow:hidden"><span style="color:#CEFA45">+</span> func attempt(_ n: Int) async throws {
+<span style="color:#CEFA45">+</span>   let delay = policy.backoff(n)
+<span style="color:#CEFA45">+</span>   try await Task.sleep(for: delay)
+<span style="color:#CEFA45">+</span>   let key = "\(invoice.id):\(n)"
+<span style="color:#CEFA45">+</span>   try await charge(key: key)
+<span style="color:#CEFA45">+</span> }</div>
+        <div style="padding:10px;display:flex;gap:8px;border-top:1px solid rgba(255,255,255,.07)"><div style="flex:1;height:30px;border-radius:15px;background:rgba(255,255,255,.1);display:grid;place-items:center;font-size:12px;font-weight:600">Drag L41–46 to chat</div><div style="height:30px;padding:0 14px;border-radius:15px;background:#CEFA45;color:#181E17;display:grid;place-items:center;font-size:12px;font-weight:600">Stage</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div></div>
+
+<!-- ═══════════════ 1c · Floating glass panels over wallpaper ═══════════════ -->
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Floating glass panels over the desktop wallpaper — every region is a detachable pane</div>
+<div class="dv-card" style="width:1180px;height:760px;position:relative;background:radial-gradient(600px 400px at 15% 20%,#6f8a3a 0%,transparent 60%),radial-gradient(700px 500px at 85% 15%,#2e5a6b 0%,transparent 60%),radial-gradient(800px 500px at 60% 100%,#4a3f6b 0%,transparent 65%),#141a16;color:#eef0ea" data-screen-label="1c Floating panels">
+<div style="position:absolute;inset:0;padding:14px;display:grid;grid-template-columns:64px 244px minmax(0,1fr) 296px;gap:12px">
+  <!-- rail -->
+  <div style="border-radius:22px;background:rgba(20,24,20,.45);backdrop-filter:blur(40px) saturate(1.6);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 20px 50px rgba(0,0,0,.35);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px">
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:center;margin-bottom:10px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span></div>
+    <img src="Design/Brand/talaria-wing.png" alt="Talaria" style="width:30px;height:30px;object-fit:contain;margin-bottom:8px">
+    <div style="width:40px;height:40px;border-radius:14px;background:rgba(206,250,69,.22);border:1px solid rgba(206,250,69,.4);display:grid;place-items:center;color:#CEFA45;font-size:16px">◑</div>
+    <div style="width:40px;height:40px;border-radius:14px;display:grid;place-items:center;color:rgba(255,255,255,.7);font-size:15px">✦</div>
+    <div style="width:40px;height:40px;border-radius:14px;display:grid;place-items:center;color:rgba(255,255,255,.7);font-size:15px">◷</div>
+    <div style="width:40px;height:40px;border-radius:14px;display:grid;place-items:center;color:rgba(255,255,255,.7);font-size:15px">▦</div>
+    <div style="width:40px;height:40px;border-radius:14px;display:grid;place-items:center;color:rgba(255,255,255,.7);font-size:15px">⌥</div>
+    <div style="flex:1"></div>
+    <div style="width:40px;height:40px;border-radius:14px;display:grid;place-items:center;color:rgba(255,255,255,.7);font-size:15px">⚙</div>
+    <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#CEFA45,#7ea23a);display:grid;place-items:center;color:#181E17;font-size:12px;font-weight:700">D</div>
+  </div>
+  <!-- sessions panel -->
+  <div style="border-radius:22px;background:rgba(20,24,20,.45);backdrop-filter:blur(40px) saturate(1.6);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 20px 50px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:16px 16px 10px;display:flex;align-items:center;gap:8px"><div style="font-size:17px;font-weight:700;letter-spacing:-.2px">Sessions</div><div style="flex:1"></div><div style="width:28px;height:28px;border-radius:14px;background:#CEFA45;color:#181E17;display:grid;place-items:center;font-weight:700;line-height:1">+</div></div>
+    <div style="margin:0 12px 8px;height:30px;border-radius:15px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:6px;padding:0 11px;color:rgba(255,255,255,.45);font-size:12px">⌕ Search</div>
+    <div style="padding:0 8px;display:flex;flex-direction:column;gap:2px;flex:1">
+      <div style="padding:9px 10px;border-radius:12px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);display:grid;gap:3px"><div style="display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600">Migrate billing worker<div style="flex:1"></div><span style="width:7px;height:7px;border-radius:50%;background:#CEFA45;animation:tal-pulse 1.4s infinite"></span></div><div style="font-size:11.5px;color:rgba(255,255,255,.55)">Running fixtures · 2m</div></div>
+      <div style="padding:9px 10px;border-radius:12px;display:grid;gap:3px"><div style="font-size:13px">Draft release notes v0.9</div><div style="font-size:11.5px;color:rgba(255,255,255,.5)">41 commits since tag</div></div>
+      <div style="padding:9px 10px;border-radius:12px;display:grid;gap:3px"><div style="display:flex;gap:6px;align-items:center;font-size:13px">Weekly metrics digest<div style="flex:1"></div><span style="height:18px;padding:0 7px;border-radius:9px;background:#CEFA45;color:#181E17;font-size:10px;font-weight:700;display:flex;align-items:center">APPROVE</span></div><div style="font-size:11.5px;color:rgba(255,255,255,.5)">Wants to read ~/Reports</div></div>
+      <div style="padding:9px 10px;border-radius:12px;font-size:13px">Explain the gateway contract</div>
+      <div style="padding:9px 10px;border-radius:12px;font-size:13px">Photo library dedupe script</div>
+      <div style="padding:9px 10px;border-radius:12px;font-size:13px;color:rgba(255,255,255,.75)">Talaria icon variants</div>
+    </div>
+    <div style="margin:10px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);display:flex;gap:9px;align-items:center"><span style="width:8px;height:8px;border-radius:50%;background:#CEFA45;box-shadow:0 0 10px #CEFA45"></span><div style="display:grid;gap:1px"><div style="font-size:12.5px;font-weight:600">default</div><div style="font-size:11px;color:rgba(255,255,255,.5)">Local Hermes · connected</div></div><div style="flex:1"></div><span style="color:rgba(255,255,255,.4);font-size:10px">⌃⌄</span></div>
+  </div>
+  <!-- chat panel -->
+  <div style="border-radius:22px;background:rgba(20,24,20,.55);backdrop-filter:blur(50px) saturate(1.5);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 20px 50px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden;min-width:0;position:relative">
+    <div style="height:54px;display:flex;align-items:center;gap:10px;padding:0 18px;border-bottom:1px solid rgba(255,255,255,.08)">
+      <div style="font-size:14px;font-weight:600">Migrate billing worker to Swift</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:rgba(255,255,255,.55)"><span style="width:6px;height:6px;border-radius:50%;background:#CEFA45;animation:tal-pulse 1.4s infinite"></span>2m 14s</div>
+      <div style="flex:1"></div>
+      <div style="height:30px;padding:0 12px;border-radius:15px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500">claude-sonnet-4.5 <span style="font-size:9px;color:rgba(255,255,255,.5)">▾</span></div>
+      <div style="width:30px;height:30px;border-radius:15px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);display:grid;place-items:center;font-size:12px;color:rgba(255,255,255,.7)">⧉</div>
+    </div>
+    <div style="flex:1;overflow:hidden;padding:24px 28px 0;display:grid;gap:22px;align-content:start">
+      <div style="justify-self:end;max-width:78%;padding:10px 14px;border-radius:18px 18px 6px 18px;background:rgba(206,250,69,.9);color:#181E17;font-size:13.5px;line-height:1.5">Port billing_worker.py to Swift, keep the retry semantics, run the fixtures.</div>
+      <div style="display:grid;gap:12px">
+        <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:rgba(255,255,255,.55)"><img src="Design/Brand/talaria-wing.png" alt="" style="width:16px;height:16px;object-fit:contain">Thought for 18s <span style="font-size:10px">▸</span></div>
+        <div style="border-radius:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:10px;height:36px;padding:0 14px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.07)"><span style="color:#CEFA45">✓</span><span style="font-weight:600">read_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(255,255,255,.6)">billing/billing_worker.py</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:36px;padding:0 14px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.07)"><span style="color:#CEFA45">✓</span><span style="font-weight:600">write_file</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(255,255,255,.6)">Sources/Billing/BillingWorker.swift</span><div style="flex:1"></div><span style="color:#CEFA45;font-size:11px">+298</span></div>
+          <div style="display:flex;align-items:center;gap:10px;height:36px;padding:0 14px;font-size:12px"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #CEFA45;border-right-color:transparent"></span><span style="font-weight:600">terminal</span><span style="font-family:ui-monospace,Menlo,monospace;color:rgba(255,255,255,.6)">swift test --filter BillingTests</span></div>
+          <div style="padding:4px 14px 12px;font:11.5px/1.6 ui-monospace,Menlo,monospace;color:rgba(255,255,255,.7);white-space:pre">✓ retriesTransientFailureThreeTimes   0.041s
+✓ backoffIsExponentialWithJitter      0.012s
+▸ idempotencyKeyIsStable…</div>
+        </div>
+        <div style="font-size:13.5px;line-height:1.6">Retry semantics preserved — three attempts, exponential backoff with jitter. Two fixtures green; on the idempotency case now.<span style="display:inline-block;width:7px;height:14px;background:#CEFA45;vertical-align:-2px;margin-left:2px;animation:tal-pulse 1s infinite"></span></div>
+      </div>
+    </div>
+    <!-- composer floats inside chat panel -->
+    <div style="padding:14px 18px 16px">
+      <div style="border-radius:24px;background:rgba(255,255,255,.1);backdrop-filter:blur(30px) saturate(1.5);border:1px solid rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 12px 40px rgba(0,0,0,.4);padding:12px 12px 10px;display:grid;gap:8px">
+        <div style="font-size:13.5px;color:rgba(255,255,255,.4);padding:4px 6px;min-height:32px">Steer Hermes…</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(255,255,255,.65)">⌇</div>
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(255,255,255,.65)">@</div>
+          <div style="width:34px;height:34px;display:grid;place-items:center;color:rgba(255,255,255,.65)">/</div>
+          <div style="flex:1"></div>
+          <div style="height:36px;padding:0 16px;border-radius:18px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600">■ Stop</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- inspector: two stacked floating panels -->
+  <div style="display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px;min-width:0">
+    <div style="border-radius:22px;background:rgba(20,24,20,.45);backdrop-filter:blur(40px) saturate(1.6);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 20px 50px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden">
+      <div style="height:54px;display:flex;align-items:center;padding:0 10px;gap:2px;border-bottom:1px solid rgba(255,255,255,.08)">
+        <div style="height:28px;padding:0 12px;border-radius:14px;background:rgba(255,255,255,.14);font-size:12px;font-weight:600;display:flex;align-items:center">Files</div>
+        <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(255,255,255,.55);display:flex;align-items:center">Review <span style="margin-left:5px;color:#CEFA45;font-weight:600">2</span></div>
+        <div style="height:28px;padding:0 12px;font-size:12px;color:rgba(255,255,255,.55);display:flex;align-items:center">Terminal</div>
+      </div>
+      <div style="padding:8px 12px;font:12px/1.9 -apple-system,system-ui,sans-serif">
+        <div style="display:flex;gap:6px;align-items:center;font-weight:600"><span style="font-size:9px;color:rgba(255,255,255,.4)">▾</span> talaria</div>
+        <div style="padding-left:18px;display:flex;gap:6px;align-items:center"><span style="font-size:9px;color:rgba(255,255,255,.4)">▾</span> Sources / Billing</div>
+        <div style="padding-left:36px;display:flex;gap:6px;align-items:center;background:rgba(206,250,69,.16);border-radius:6px;margin:0 -6px;padding-right:6px"><span style="width:9px;height:11px;border:1px solid rgba(255,255,255,.4);border-radius:2px"></span>BillingWorker.swift<div style="flex:1"></div><span style="font-size:10px;color:#CEFA45;font-weight:600">A</span></div>
+        <div style="padding-left:36px;display:flex;gap:6px;align-items:center;color:rgba(255,255,255,.8)"><span style="width:9px;height:11px;border:1px solid rgba(255,255,255,.4);border-radius:2px"></span>RetryPolicy.swift<div style="flex:1"></div><span style="font-size:10px;color:#f2b84b;font-weight:600;margin-right:6px">M</span></div>
+        <div style="padding-left:18px;display:flex;gap:6px;align-items:center;color:rgba(255,255,255,.8)"><span style="font-size:9px;color:rgba(255,255,255,.4)">▸</span> Tests</div>
+      </div>
+      <div style="margin:4px 12px 12px;flex:1;border-radius:12px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.07);overflow:hidden;display:flex;flex-direction:column">
+        <div style="padding:7px 10px;font-size:11px;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);display:flex">BillingWorker.swift<div style="flex:1"></div>L 41–46</div>
+        <div style="font:11px/1.65 ui-monospace,Menlo,monospace;padding:8px 10px;color:rgba(255,255,255,.8);white-space:pre;overflow:hidden">func attempt(_ n: Int) async throws {
+  let delay = policy.backoff(n)
+  try await Task.sleep(for: delay)
+  <span style="background:rgba(206,250,69,.35)">let key = "\(invoice.id):\(n)"</span>
+  try await charge(key: key)
+}</div>
+      </div>
+    </div>
+    <div style="border-radius:22px;background:rgba(20,24,20,.45);backdrop-filter:blur(40px) saturate(1.6);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 20px 50px rgba(0,0,0,.35);padding:14px 16px;display:grid;gap:9px">
+      <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.5);display:flex">Status<div style="flex:1"></div>2 / 4</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12.5px;color:rgba(255,255,255,.6)"><span style="color:#CEFA45">☑</span>Read Python worker</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12.5px;color:rgba(255,255,255,.6)"><span style="color:#CEFA45">☑</span>Write Swift port</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12.5px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;border:2px solid #CEFA45;border-right-color:transparent;margin:0 1px"></span>Run fixtures</div>
+      <div style="display:flex;gap:8px;align-items:center;font-size:12.5px;color:rgba(255,255,255,.45)"><span>☐</span>Summarize diff</div>
+    </div>
+  </div>
+</div>
+</div></div>
+
+</div>
+<p class="dv-next">Try next: "carry <a class="dv-oid" href="#1b">1b</a> into Skills, Cron, Kanban, Settings and Onboarding" · "<a class="dv-oid" href="#1a">1a</a> in dark" · "make <a class="dv-oid" href="#1c">1c</a> lighter, less wallpaper" · "show the approval request and the queue in the composer"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;navigation&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sidebar&quot;,&quot;tabs&quot;],&quot;default&quot;:&quot;sidebar&quot;,&quot;tsType&quot;:&quot;'sidebar' | 'tabs'&quot;,&quot;section&quot;:&quot;4a · Sessions&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const tabs = (this.props.navigation ?? 'sidebar') === 'tabs';
+    return { tabSessions: tabs, sidebarSessions: !tabs };
+  }
+}
+</script>
+</body>
+</html>

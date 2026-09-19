@@ -5,7 +5,11 @@ import HermesCore
 public struct AttachmentStrip: View {
     public let items: [AttachmentItem]
     private let onRemove: @MainActor (UUID) -> Void
+    #if os(macOS)
+    private let textWidth: CGFloat = 170
+    #else
     @ScaledMetric(relativeTo: .callout) private var textWidth: CGFloat = 170
+    #endif
 
     public init(items: [AttachmentItem], onRemove: @escaping @MainActor (UUID) -> Void) {
         self.items = items
@@ -18,20 +22,20 @@ public struct AttachmentStrip: View {
                 ForEach(items) { item in
                     HStack(alignment: .top, spacing: 9) {
                         Image(systemName: item.kind == .image ? "photo" : "doc")
-                            .font(.body).foregroundStyle(TalariaStyle.accent).padding(.top, 2)
+                            .font(TalariaTypography.body).foregroundStyle(TalariaStyle.accent).padding(.top, 2)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(item.filename).font(.callout.weight(.medium)).lineLimit(2)
+                            Text(item.filename).font(TalariaTypography.callout.weight(.medium)).lineLimit(2)
                                 .truncationMode(.middle)
                             status(item)
                             if let destination = item.destination, !destination.isEmpty {
-                                Text("On Hermes host: \(destination)").font(.caption).foregroundStyle(.secondary)
+                                Text("On Hermes host: \(destination)").font(TalariaTypography.caption).foregroundStyle(.secondary)
                                     .lineLimit(2).truncationMode(.middle)
                             }
                         }
                         .frame(width: textWidth, alignment: .leading)
                         Button { onRemove(item.id) } label: {
-                            Image(systemName: "xmark").font(.callout.weight(.semibold)).foregroundStyle(.secondary)
+                            Image(systemName: "xmark").font(TalariaTypography.callout.weight(.semibold)).foregroundStyle(.secondary)
                                 .frame(width: removalTargetSize, height: removalTargetSize)
                                 .contentShape(Rectangle())
                         }
@@ -63,17 +67,17 @@ public struct AttachmentStrip: View {
         case .reading, .uploading:
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text(item.state == .reading ? "Reading…" : "Uploading…").font(.caption).foregroundStyle(.secondary)
+                Text(item.state == .reading ? "Reading…" : "Uploading…").font(TalariaTypography.caption).foregroundStyle(.secondary)
             }
         case .ready:
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle").foregroundStyle(.green)
                 Text(item.byteCount.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "Ready")
                     .foregroundStyle(.secondary)
-            }.font(.caption)
+            }.font(TalariaTypography.caption)
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.circle")
-                .font(.caption).foregroundStyle(.red).lineLimit(3)
+                .font(TalariaTypography.caption).foregroundStyle(.red).lineLimit(3)
         }
     }
 }

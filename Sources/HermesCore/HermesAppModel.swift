@@ -26,6 +26,34 @@ public final class HermesAppModel {
     public private(set) var attachmentDrafts: [ComposerScope: [AttachmentItem]] = [:]
     public private(set) var submittingScopes = Set<ComposerScope>()
     public private(set) var savedEndpoint: GatewayEndpoint?
+    public private(set) var mobileActivity = MobileActivitySnapshot()
+    public private(set) var isLoadingMobileActivity = false
+    public private(set) var mobileActivityError: String?
+    public private(set) var mobilePendingInputs: [MobilePendingInput] = []
+    public private(set) var hierarchyDestination: HierarchyDestination = .home
+    public private(set) var homeAvailability: HomeAvailability = .unselected
+    public private(set) var runDetails: [String: AutomationRunDetail] = [:]
+    public private(set) var loadingRunIDs = Set<String>()
+    public private(set) var loadingAutomationRunIDs = Set<String>()
+    public private(set) var automationActionIDs = Set<String>()
+    public private(set) var hierarchyError: String?
+    public private(set) var activityRequestFocusID: RPCID?
+    public var hierarchyFeatures = HierarchyFeatureFlags()
+    public private(set) var telegramTopics: [TelegramTopic] = []
+    public private(set) var isLoadingTelegramTopics = false
+    public private(set) var telegramTopicsError: String?
+    @ObservationIgnored private var hasLoadedTelegramTopics = false
+    @ObservationIgnored private var telegramTopicsRevision = 0
+    @ObservationIgnored private let telegramTopicsLoader: TelegramTopicsLoader?
+    public let classificationStore: HierarchyClassificationStore
+    private var seenMobileRunIDs = Set<String>()
+    private var requestReceiptStore: [ComposerScope: [RequestReceipt]] = [:]
+    @ObservationIgnored private let mobileActivityLoader: MobileActivityLoader?
+    @ObservationIgnored private let runDetailLoader: AutomationRunDetailLoader?
+    @ObservationIgnored private let automationRunsLoader: AutomationRunsLoader?
+    @ObservationIgnored private var automationRefreshTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var mobileActivityTask: Task<MobileActivitySnapshot, Error>?
+    @ObservationIgnored private var mobileActivityRevision = 0
     @ObservationIgnored private var client: GatewayClient
     @ObservationIgnored private let clientFactory: @MainActor () -> GatewayClient
     @ObservationIgnored private let defaults: UserDefaults
@@ -34,6 +62,7 @@ public final class HermesAppModel {
     @ObservationIgnored private let credentials = CredentialStore()
     @ObservationIgnored private var receiver: Task<Void, Never>?
     @ObservationIgnored private var generation = UUID()
+    @ObservationIgnored private var hierarchyNavigationRevision = 0
     @ObservationIgnored private var token: String?
     @ObservationIgnored private var uploadedAttachments: [UUID: UploadedAttachment] = [:]
     @ObservationIgnored private var attachmentWorkspaces: [UUID: String] = [:]
@@ -56,15 +85,87 @@ public final class HermesAppModel {
 
     public init(defaults: UserDefaults = .standard, draftStore: DraftStore? = nil,
                 sender: AttachmentSender = AttachmentSender(),
+                mobileActivityLoader: MobileActivityLoader? = nil,
+                runDetailLoader: AutomationRunDetailLoader? = nil,
+                automationRunsLoader: AutomationRunsLoader? = nil,
+                telegramTopicsLoader: TelegramTopicsLoader? = nil,
                 clientFactory: @escaping @MainActor () -> GatewayClient = { GatewayClient() }) {
+        self.classificationStore = HierarchyClassificationStore(defaults: defaults)
         self.defaults = defaults; self.draftStore = draftStore ?? DraftStore(); self.sender = sender
         self.clientFactory = clientFactory; client = clientFactory()
+        self.mobileActivityLoader = mobileActivityLoader
+        self.runDetailLoader = runDetailLoader
+        self.automationRunsLoader = automationRunsLoader
+        self.telegramTopicsLoader = telegramTopicsLoader
         if let data = defaults.data(forKey: "gateway.endpoint") {
             savedEndpoint = try? JSONDecoder().decode(GatewayEndpoint.self, from: data)
         }
     }
 
     public var conversation: ConversationState? { selectedID.flatMap { conversations[$0] } }
+    public var unreadMobileRunCount: Int {
+        mobileActivity.runs.filter { isRunUnread($0) }.count
+    }
+
+    public func refreshMobileActivity() async {
+        guard isConnected, !isLoadingMobileActivity, loadingAutomationRunIDs.isEmpty, let endpoint, let token else { return }
+        let stamp = generation
+        mobileActivityRevision += 1; let revision = mobileActivityRevision
+        let client = client; let loader = mobileActivityLoader
+        isLoadingMobileActivity = true; mobileActivityError = nil
+        let task = Task {
+            if let loader { return try await loader(client, endpoint, token) }
+            return try await MobileActivityService(client: client,
+                reader: GatewayReader(endpoint: endpoint, token: token)).load(profile: endpoint.profile)
+        }
+        mobileActivityTask = task
+        defer {
+            if generation == stamp, mobileActivityRevision == revision {
+                isLoadingMobileActivity = false; mobileActivityTask = nil
+            }
+        }
+        do {
+            let snapshot = try await task.value
+            guard generation == stamp, mobileActivityRevision == revision, isConnected else { return }
+            let previousRuns = Dictionary(uniqueKeysWithValues: mobileActivity.runs.map { ($0.id, $0) })
+            let changed = Set(snapshot.runs.compactMap { run -> String? in
+                guard let previous = previousRuns[run.id] else { return nil }
+                return previous != run ? run.id : nil
+            })
+            for id in changed { runDetails.removeValue(forKey: id) }
+            mobileActivity = snapshot
+            if case .run(let id) = hierarchyDestination, changed.contains(id) { await loadRunDetail(id) }
+        } catch {
+            guard generation == stamp, mobileActivityRevision == revision, !(error is CancellationError) else { return }
+            mobileActivityError = safeDescription(error)
+        }
+    }
+
+    public func markMobileRunsSeen() {
+        guard isConnected, let endpoint else { return }
+        let current = mobileActivity.runs.filter { !$0.isActive && $0.status.isTerminal }.map(\.id)
+        let retained = current + seenMobileRunIDs.sorted().filter { !current.contains($0) }
+        seenMobileRunIDs = Set(retained.prefix(2_000))
+        defaults.set(seenMobileRunIDs.sorted(), forKey: mobileSeenKey(endpoint))
+    }
+
+    private func mobileSeenKey(_ endpoint: GatewayEndpoint) -> String {
+        let parts = [endpoint.id.uuidString, endpoint.baseURL.absoluteString, endpoint.profile]
+        let data = (try? JSONEncoder().encode(parts)) ?? Data()
+        return "mobile.activity.seen." + data.base64EncodedString()
+    }
+
+    private func resetMobileActivity(for endpoint: GatewayEndpoint? = nil, preserveLoaded: Bool = false) {
+        for task in automationRefreshTasks.values { task.cancel() }
+        automationRefreshTasks = [:]; loadingAutomationRunIDs = []
+        mobileActivityTask?.cancel(); mobileActivityTask = nil; mobileActivityRevision += 1
+        if !preserveLoaded { mobileActivity = MobileActivitySnapshot() }
+        mobileActivityError = nil
+        isLoadingMobileActivity = false; mobilePendingInputs = []
+        if let endpoint {
+            seenMobileRunIDs = Set((defaults.stringArray(forKey: mobileSeenKey(endpoint)) ?? []).prefix(2_000))
+        } else if !preserveLoaded { seenMobileRunIDs = [] }
+    }
     public var composerScope: ComposerScope? {
         guard let endpoint, let selectedID else { return nil }
         return ComposerScope(connectionID: endpoint.id, profile: endpoint.profile, storedSessionID: selectedID)
@@ -75,7 +176,7 @@ public final class HermesAppModel {
         attachments.contains { $0.state == .reading || $0.state == .uploading }
     }
     public var canAttach: Bool {
-        isConnected && conversation != nil && !isLoadingSession && !isSubmitting && !isTransferringAttachments
+        isConnected && telegramDestinationIsReady && conversation != nil && !isLoadingSession && !isSubmitting && !isTransferringAttachments
             && conversation?.isRunning != true && conversation?.requiresHydration != true
             && conversation?.hasQueuedPrompt != true
             && attachments.count < AttachmentLoader.maximumCount
@@ -86,7 +187,7 @@ public final class HermesAppModel {
         }
     }
     public var canSend: Bool {
-        isConnected && !isLoadingSession && conversation != nil && conversation?.isRunning != true
+        isConnected && telegramDestinationIsReady && !isLoadingSession && conversation != nil && conversation?.isRunning != true
             && conversation?.requiresHydration != true
             && conversation?.hasQueuedPrompt != true
             && !isSubmitting && !isApplyingSettings && attachments.allSatisfy { $0.state == .ready }
@@ -102,6 +203,7 @@ public final class HermesAppModel {
         let previous = sameConnection ? selectedID : draftStore.selectedSession(for: owner)
         let previousToken = sameHost ? token : nil
         let stamp = UUID(); generation = stamp
+        resetMobileActivity(for: endpoint, preserveLoaded: sameConnection)
         releaseSnapshotWaiters()
         appliedSnapshots = [:]
         receiver?.cancel(); refreshTask?.cancel()
@@ -113,12 +215,18 @@ public final class HermesAppModel {
         guard generation == stamp else { return }
         selectedID = nil
         self.endpoint = endpoint
+        telegramTopics = []; telegramTopicsError = nil; hasLoadedTelegramTopics = false
+        isLoadingTelegramTopics = false; hierarchyFeatures.telegramBindings = false
+        hierarchyDestination = .home
+        if !sameConnection { runDetails = [:] }
+        loadingRunIDs = []; automationActionIDs = []; hierarchyError = nil
+        homeAvailability = homeSessionID == nil ? .unselected : .available
         // Runtime IDs and replay cursors belong to a socket attachment. Rehydrate on every reconnect.
         conversations = [:]; selectedID = nil; draft = ""; isLoadingSession = false
         pendingRequests = [:]
         settingsSnapshot = nil; settingsError = nil; isLoadingSettings = false
         backgroundHydrations = []
-        sessions = []
+        if !sameConnection { sessions = [] }
         do {
             let selectedToken: String?
             if let suppliedToken, !suppliedToken.isEmpty { selectedToken = suppliedToken }
@@ -143,7 +251,14 @@ public final class HermesAppModel {
                 } catch { banner = "Connected, but the connection could not be saved to Keychain." }
             }
             await refreshSessions()
-            if let previous { await openSession(previous, force: true) }
+            await refreshTelegramTopics()
+            guard generation == stamp, isConnected else { return }
+            if homeSessionID != nil { await navigate(to: .home) }
+            else if let previous {
+                await openSession(previous, force: true)
+                guard generation == stamp else { return }
+                hierarchyDestination = .conversation(previous)
+            }
         } catch {
             guard generation == stamp else { return }
             isConnecting = false; isConnected = false
@@ -162,6 +277,7 @@ public final class HermesAppModel {
 
     public func disconnect() async {
         generation = UUID(); receiver?.cancel(); refreshTask?.cancel()
+        resetMobileActivity(preserveLoaded: true)
         releaseSnapshotWaiters()
         cancelAttachmentTransfers()
         do { try draftStore.flush() } catch { banner = draftStore.lastError }
@@ -206,7 +322,7 @@ public final class HermesAppModel {
     public func openSession(_ id: StoredSessionID, force: Bool = false) async {
         guard isConnected, !isLoadingSession, let endpoint else { return }
         let client = client
-        if !force, let cached = conversations[id], !cached.requiresHydration { select(id); return }
+        if !force, let cached = conversations[id], !cached.requiresHydration { select(id); if id == homeSessionID { homeAvailability = .available }; return }
         let stamp = generation; isLoadingSession = true
         let beforeSnapshot = snapshotVersion
         defer { if generation == stamp { isLoadingSession = false } }
@@ -216,7 +332,20 @@ public final class HermesAppModel {
                 "source": .string("native")
             ]), timeout: 90)
             await waitForSnapshot(result, after: beforeSnapshot, generation: stamp)
-        } catch { if generation == stamp { banner = safeDescription(error) } }
+        } catch {
+            if generation == stamp {
+                banner = safeDescription(error)
+                conversations[id]?.requiresHydration = true
+                if id == homeSessionID {
+                    homeAvailability = HomeResolution.isConfirmedMissing(error) ? .unavailable : .failed(safeDescription(error))
+                }
+            }
+            return
+        }
+        if generation == stamp, id == homeSessionID {
+            if conversations[id] != nil { homeAvailability = .available; cacheHomeTranscript() }
+            else { homeAvailability = .failed("Hermes returned a different conversation. Choose the conversation to use as Home.") }
+        }
     }
 
     public func send() async {
@@ -298,11 +427,21 @@ public final class HermesAppModel {
         guard isConnected else { return false }
         let client = client
         let stamp = generation
+        let authoritative = pendingRequests[input.id]
+        let receiptOwner = conversations.values.first { state in
+            state.owner == currentHierarchyOwner && state.pendingInputs.contains { $0.id == input.id }
+        }.map { ComposerScope(owner: $0.owner, sessionID: $0.storedID) }
         do {
             try await client.respond(to: input.id, result: result)
             guard generation == stamp else { return false }
+            if let receiptOwner, let authoritative {
+                let receipt = RequestReceipt(id: input.id, method: authoritative.method, result: result)
+                requestReceiptStore[receiptOwner, default: []].append(receipt)
+                requestReceiptStore[receiptOwner] = Array((requestReceiptStore[receiptOwner] ?? []).suffix(20))
+            }
             pendingRequests.removeValue(forKey: input.id)
             for id in conversations.keys { conversations[id]?.removeRequest(input.id) }
+            updateMobilePendingInputs()
             return true
         } catch {
             if generation == stamp { banner = safeDescription(error) }
@@ -540,10 +679,13 @@ public final class HermesAppModel {
         case .connected: isConnected = true
         case .disconnected(let reason):
             isConnected = false
+            resetMobileActivity(preserveLoaded: true)
             releaseSnapshotWaiters()
             cancelAttachmentTransfers()
             pendingRequests = [:]
-            if let reason { banner = reason + " Reconnect to restore the conversation." }
+            if let reason {
+                banner = conversations.isEmpty ? reason : reason + " Reconnect to restore the conversation."
+            }
             for id in conversations.keys { conversations[id]?.pendingInputs = [] }
         case .snapshot(_, let result):
             defer { if generation == stamp { finishSnapshot(result) } }
@@ -578,6 +720,7 @@ public final class HermesAppModel {
                 invalidateAttachments(for: state)
                 attachPendingRequests()
                 if !background { select(state.storedID) }
+                if state.storedID == homeSessionID { homeAvailability = .available; cacheHomeTranscript() }
             } catch { banner = safeDescription(error) }
         case .event(let event):
             if event.type == "request.cancel", let raw = event.payload["id"]?.stringValue {
@@ -594,6 +737,8 @@ public final class HermesAppModel {
                     guard generation == stamp else { return }
                 }
             }
+            updateMobilePendingInputs()
+            if event.type == "message.complete" { cacheHomeTranscript() }
             for state in conversations.values {
                 invalidateAttachments(for: state)
                 if event.type == "message.complete", event.sessionID == state.runtimeID.rawValue || event.sessionID == state.storedID.rawValue {
@@ -643,11 +788,535 @@ public final class HermesAppModel {
                 }
             }
         }
+        updateMobilePendingInputs()
+    }
+
+    private func updateMobilePendingInputs() {
+        guard let endpoint, isConnected else { mobilePendingInputs = []; return }
+        let owner = SessionOwner(connectionID: endpoint.id, profile: endpoint.profile)
+        mobilePendingInputs = pendingRequests.values.map { request in
+            let ids = [request.params["session_id"]?.stringValue,
+                       request.params["gateway_session_id"]?.stringValue].compactMap { $0 }
+            let state = conversations.values.first {
+                $0.owner == owner && (ids.contains($0.runtimeID.rawValue) || ids.contains($0.storedID.rawValue))
+            }
+            return MobilePendingInput(input: PendingInput(request), state: state)
+        }.sorted { $0.id < $1.id }
+        // Request settlement can precede the next activity refresh. Reflect it
+        // immediately without leaving a cached run stuck at Waiting for input.
+        for (id, detail) in runDetails {
+            guard let index = mobileActivity.runs.firstIndex(where: { $0.id == id }) else { continue }
+            let run = mobileActivity.runs[index]
+            let waiting = mobilePendingInputs.contains { $0.sessionID == run.sessionID }
+            let status = waiting ? AutomationRunStatus.waitingForInput : AutomationRunResult.status(for: run, result: detail.result)
+            guard detail.status != status else { continue }
+            runDetails[id] = AutomationRunDetail(runID: id, result: detail.result, messages: detail.messages,
+                status: status, executionAvailable: detail.executionAvailable, isHistoryTruncated: detail.isHistoryTruncated)
+            mobileActivity.runs[index].status = status
+        }
     }
 
     private func safeDescription(_ error: Error) -> String {
         var text = error.localizedDescription
         if let token, !token.isEmpty { text = text.replacingOccurrences(of: token, with: "[redacted]") }
         return text
+    }
+}
+
+extension HermesAppModel {
+    /// Capability discovery is read-only. Only an explicit import creates organisation.
+    public func refreshTelegramTopics() async {
+        guard isConnected, let endpoint, let token else { return }
+        let stamp = generation
+        telegramTopicsRevision += 1; let revision = telegramTopicsRevision
+        isLoadingTelegramTopics = true; telegramTopicsError = nil
+        defer { if generation == stamp, telegramTopicsRevision == revision { isLoadingTelegramTopics = false } }
+        do {
+            let response: JSONValue
+            if let telegramTopicsLoader { response = try await telegramTopicsLoader(endpoint, token) }
+            else { response = try await GatewayReader(endpoint: endpoint, token: token).read(.telegramTopics) }
+            let snapshot = try TelegramTopicsSnapshot(json: response, expectedProfile: endpoint.profile)
+            guard generation == stamp, revision == telegramTopicsRevision, isConnected,
+                  let owner = currentHierarchyOwner else { return }
+            telegramTopics = snapshot.topics; hasLoadedTelegramTopics = true
+            hierarchyFeatures.telegramBindings = true
+            classificationStore.update(for: owner) { $0.reconcileTelegramTopics(snapshot.topics) }
+            // Topic bindings can point beyond the ordinary latest-100 session list.
+            let existing = Set(sessions.map(\.id))
+            sessions += snapshot.topics.filter { !existing.contains($0.currentSessionID) }.map { topic in
+                SessionSummary(json: .object(["id": .string(topic.currentSessionID.rawValue),
+                    "title": .string(topic.displayLabel), "source": .string("telegram")]))
+            }
+        } catch {
+            guard generation == stamp, revision == telegramTopicsRevision else { return }
+            hasLoadedTelegramTopics = false
+            if case GatewayTransportError.httpStatus(404) = error {
+                hierarchyFeatures.telegramBindings = false
+                telegramTopicsError = "This Hermes gateway does not expose Telegram topics yet. Install the Talaria gateway extension to import them."
+            } else { telegramTopicsError = safeDescription(error) }
+        }
+    }
+
+    @discardableResult public func importTelegramTopics(home: TelegramTopicIdentity?,
+        asWorkspaces identities: Set<TelegramTopicIdentity>) async -> Bool {
+        guard !isLoadingTelegramTopics, isConnected, let owner = currentHierarchyOwner else { return false }
+        let stamp = generation
+        await refreshTelegramTopics()
+        guard generation == stamp, hasLoadedTelegramTopics, owner == currentHierarchyOwner else { return false }
+        let available = Set(telegramTopics.map(\.id))
+        guard identities.isSubset(of: available), home.map(available.contains) ?? true else {
+            telegramTopicsError = "A selected Telegram topic is no longer available. Refresh and choose again."; return false
+        }
+        classificationStore.update(for: owner) {
+            $0.importTelegramTopics(telegramTopics, home: home, asWorkspaces: identities)
+        }
+        guard classificationStore.error == nil else { return false }
+        await navigate(to: home == nil ? .workspaces : .home)
+        return true
+    }
+
+    public func telegramTopic(for workspaceID: UUID) -> TelegramTopic? {
+        guard let assignment = telegramAssignment(for: .workspace(workspaceID)) else { return nil }
+        return telegramTopics.first { $0.id == assignment.identity }
+    }
+
+    private func telegramAssignment(for destination: HierarchyDestination) -> TelegramTopicAssignment? {
+        hierarchyClassification.telegramTopicAssignments.first { assignment in
+            switch (destination, assignment.destination) {
+            case (.home, .home): true
+            case (.workspace(let id), .workspace(let assigned)): id == assigned
+            case (.conversation(let id), _): id == assignment.lastKnownSessionID
+            default: false
+            }
+        }
+    }
+
+    private var telegramDestinationIsReady: Bool {
+        guard let assignment = telegramAssignment(for: hierarchyDestination) else { return true }
+        return hasLoadedTelegramTopics && !isLoadingTelegramTopics
+            && telegramTopics.contains { $0.id == assignment.identity && $0.currentSessionID == selectedID }
+    }
+
+    public func requestReceipts(for sessionID: StoredSessionID) -> [RequestReceipt] {
+        guard let owner = currentHierarchyOwner else { return [] }
+        return requestReceiptStore[ComposerScope(owner: owner, sessionID: sessionID)] ?? []
+    }
+    public var currentHierarchyOwner: SessionOwner? {
+        endpoint.map { SessionOwner(connectionID: $0.id, profile: $0.profile) }
+    }
+    public var hierarchyClassification: HierarchyClassification {
+        currentHierarchyOwner.map { classificationStore.classification(for: $0) } ?? HierarchyClassification()
+    }
+    public var homeSessionID: StoredSessionID? { hierarchyClassification.homeSessionID }
+    public var cachedHomeMessages: [ChatMessage] { hierarchyClassification.cachedHomeMessages }
+    public var workspaces: [TalariaWorkspace] { hierarchyClassification.workspaces }
+    public var automations: [TalariaAutomation] { mobileActivity.schedules }
+    public var runs: [AutomationRun] { mobileActivity.runs }
+    public var needsYouCount: Int { mobilePendingInputs.count }
+    public var activityCount: Int { needsYouCount + unreadMobileRunCount }
+    public var otherConversations: [SessionSummary] {
+        let classified = Set(workspaces.flatMap(\.sessionIDs))
+        let knownRuns = Set(runs.map(\.sessionID))
+        return filteredSessions.filter { $0.id != homeSessionID && !classified.contains($0.id) && !knownRuns.contains($0.id) && !hierarchyClassification.archivedSessionIDs.contains($0.id) }
+    }
+    public var archivedConversations: [SessionSummary] {
+        filteredSessions.filter { hierarchyClassification.archivedSessionIDs.contains($0.id) && $0.id != homeSessionID && workspace(for: $0.id) == nil }
+    }
+    public func archiveConversation(_ id: StoredSessionID, archived: Bool = true) {
+        guard let owner = currentHierarchyOwner, id != homeSessionID else { return }
+        classificationStore.update(for: owner) { value in
+            if archived { value.archivedSessionIDs.insert(id) } else { value.archivedSessionIDs.remove(id) }
+        }
+    }
+    public func createConversationForDiscussion() async -> StoredSessionID? {
+        let stamp = generation; let before = selectedID
+        await newConversation()
+        guard generation == stamp, let id = selectedID, id != before else { return nil }
+        return id
+    }
+    public func newConversation(in workspaceID: UUID, startedFrom parent: StoredSessionID? = nil) async {
+        guard workspace(id: workspaceID) != nil else { return }
+        let owner = currentHierarchyOwner; let before = selectedID; let stamp = generation
+        await newConversation()
+        guard generation == stamp, owner == currentHierarchyOwner, let id = selectedID, id != before else { return }
+        assignSession(id, to: workspaceID)
+        if let parent { recordLineage(child: id, parent: parent, kind: .branch) }
+        hierarchyDestination = .workspace(workspaceID)
+    }
+    public func workspace(id: UUID) -> TalariaWorkspace? { workspaces.first { $0.id == id } }
+    public func workspace(for sessionID: StoredSessionID) -> TalariaWorkspace? {
+        workspaces.first { $0.sessionIDs.contains(sessionID) }
+    }
+    public func automationRuns(_ id: String) -> [AutomationRun] { runs.filter { $0.automationID == id } }
+    public func automationRuns(id: String) -> [AutomationRun] { automationRuns(id) }
+    public func isRunUnread(_ id: String) -> Bool { runs.first(where: { $0.id == id }).map(isRunUnread) ?? false }
+    public func isRunUnread(_ run: AutomationRun) -> Bool {
+        !run.isActive && run.status.isTerminal && !seenMobileRunIDs.contains(run.id)
+            && !hierarchyClassification.readRunIDs.contains(run.id)
+    }
+    public func openActivityInput(_ item: MobilePendingInput) async {
+        activityRequestFocusID = item.input.id
+        guard let sessionID = item.sessionID else { return }
+        await navigate(to: sessionID == homeSessionID ? .home : .conversation(sessionID))
+    }
+    public var canAnswerPendingText: Bool {
+        let inputs = conversation?.pendingInputs ?? []
+        return isConnected && inputs.count == 1 && inputs[0].method == "clarify"
+            && (inputs[0].params["questions"]?.arrayValue ?? []).isEmpty
+    }
+    @discardableResult public func answerPendingText(_ text: String) async -> Bool {
+        guard canAnswerPendingText, let input = conversation?.pendingInputs.first,
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        let scope = composerScope; let stamp = generation
+        let acknowledged = await answer(input, result: .object(["answer": .string(text)]))
+        if acknowledged, generation == stamp, composerScope == scope, draft == text { draft = "" }
+        return acknowledged
+    }
+    @discardableResult public func openHierarchyLink(_ url: URL) async -> Bool {
+        guard url.scheme == "talaria", url.host == "run", let owner = currentHierarchyOwner,
+              let route = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              route.queryItems?.first(where: { $0.name == "connection" })?.value == owner.connectionID.uuidString,
+              route.queryItems?.first(where: { $0.name == "profile" })?.value == owner.profile else { return false }
+        let id = String(url.path.dropFirst())
+        guard runs.contains(where: { $0.id == id }) else { return false }
+        await navigate(to: .run(id)); return true
+    }
+    public func navigate(to destination: HierarchyDestination) async {
+        if case .conversation = destination, let assignment = telegramAssignment(for: destination) {
+            switch assignment.destination {
+            case .home: await navigate(to: .home)
+            case .workspace(let id): await navigate(to: .workspace(id))
+            }
+            return
+        }
+        hierarchyNavigationRevision += 1
+        let revision = hierarchyNavigationRevision; let stamp = generation
+        hierarchyDestination = destination; hierarchyError = nil
+        // A previous resume is allowed to finish, but a later destination owns
+        // navigation. Waiting here prevents a quick second click from being
+        // silently discarded by openSession's single-flight guard.
+        switch destination {
+        case .home, .conversation, .workspace:
+            while isLoadingSession {
+                do { try await Task.sleep(for: .milliseconds(20)) } catch { return }
+                guard generation == stamp, hierarchyNavigationRevision == revision else { return }
+            }
+        default: break
+        }
+        guard generation == stamp, hierarchyNavigationRevision == revision else { return }
+        if telegramAssignment(for: destination) != nil {
+            await refreshTelegramTopics()
+            guard generation == stamp, hierarchyNavigationRevision == revision else { return }
+            guard let assignment = telegramAssignment(for: destination), hasLoadedTelegramTopics,
+                  telegramTopics.contains(where: { $0.id == assignment.identity }) else {
+                let message = telegramTopicsError ?? "This Telegram topic is unavailable. Its saved conversation has been retained."
+                hierarchyError = message; banner = message
+                if destination == .home { homeAvailability = hasLoadedTelegramTopics ? .unavailable : .failed(message) }
+                return
+            }
+        }
+        switch destination {
+        case .home:
+            guard let id = homeSessionID else { homeAvailability = .unselected; return }
+            guard isConnected else { return }
+            homeAvailability = .loading
+            await openSession(id, force: telegramAssignment(for: destination) != nil)
+        case .conversation(let id): await openSession(id)
+        case .workspace(let id):
+            if let sessionID = telegramAssignment(for: destination)?.lastKnownSessionID ?? workspace(id: id)?.sessionIDs.first {
+                await openSession(sessionID, force: telegramAssignment(for: destination) != nil)
+            }
+        case .automations, .activity:
+            if mobileActivity.schedules.isEmpty { await refreshMobileActivity() }
+        case .automation(let id):
+            if mobileActivity.schedules.isEmpty { await refreshMobileActivity() }
+            guard generation == stamp, hierarchyNavigationRevision == revision else { return }
+            await refreshAutomationRuns(id)
+        case .run(let id): await loadRunDetail(id)
+        case .workspaces, .otherConversations: break
+        }
+    }
+    public func chooseHome(_ id: StoredSessionID) async {
+        guard let owner = currentHierarchyOwner else { return }
+        classificationStore.update(for: owner) { value in
+            value.telegramTopicAssignments.removeAll { $0.destination == .home || $0.lastKnownSessionID == id }
+            if value.homeSessionID != id { value.cachedHomeMessages = [] }
+            value.homeSessionID = id
+            value.archivedSessionIDs.remove(id)
+            for index in value.workspaces.indices { value.workspaces[index].sessionIDs.removeAll { $0 == id } }
+        }
+        await navigate(to: .home)
+    }
+    public func startFreshHome() async {
+        let before = selectedID; let stamp = generation
+        await newConversation()
+        guard generation == stamp, let selectedID, selectedID != before else { return }
+        await chooseHome(selectedID)
+    }
+    @discardableResult public func createWorkspace(name: String, purpose: String = "", swatch: String = "#4F6AF2",
+                                                  sessionID: StoredSessionID? = nil) -> UUID? {
+        guard let owner = currentHierarchyOwner else { return nil }
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, sessionID != homeSessionID || sessionID == nil else { return nil }
+        let workspace = TalariaWorkspace(name: String(name.prefix(200)), purpose: String(purpose.prefix(2_000)),
+            swatch: swatch, sessionIDs: sessionID.map { [$0] } ?? [])
+        classificationStore.update(for: owner) { value in
+            if let sessionID {
+                value.telegramTopicAssignments.removeAll { $0.lastKnownSessionID == sessionID }
+                for index in value.workspaces.indices { value.workspaces[index].sessionIDs.removeAll { $0 == sessionID } }
+            }
+            value.workspaces.append(workspace)
+        }
+        return workspaces.contains(where: { $0.id == workspace.id }) ? workspace.id : nil
+    }
+    public func assignSession(_ sessionID: StoredSessionID, to workspaceID: UUID) {
+        guard let owner = currentHierarchyOwner, sessionID != homeSessionID,
+              workspace(id: workspaceID) != nil else { return }
+        classificationStore.update(for: owner) { value in
+            value.telegramTopicAssignments.removeAll { $0.lastKnownSessionID == sessionID }
+            value.archivedSessionIDs.remove(sessionID)
+            for index in value.workspaces.indices {
+                value.workspaces[index].sessionIDs.removeAll { $0 == sessionID }
+                if value.workspaces[index].id == workspaceID { value.workspaces[index].sessionIDs.append(sessionID) }
+            }
+        }
+    }
+    public func removeSessionFromWorkspace(_ sessionID: StoredSessionID) {
+        guard let owner = currentHierarchyOwner else { return }
+        classificationStore.update(for: owner) { value in
+            value.telegramTopicAssignments.removeAll { $0.lastKnownSessionID == sessionID }
+            for index in value.workspaces.indices { value.workspaces[index].sessionIDs.removeAll { $0 == sessionID } }
+        }
+    }
+    public func updateWorkspace(_ id: UUID, name: String, purpose: String, swatch: String) {
+        guard let owner = currentHierarchyOwner, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        classificationStore.update(for: owner) { value in
+            guard let index = value.workspaces.firstIndex(where: { $0.id == id }) else { return }
+            value.workspaces[index].name = String(name.prefix(200)); value.workspaces[index].purpose = String(purpose.prefix(2_000))
+            value.workspaces[index].swatch = swatch
+        }
+    }
+    public func archiveWorkspace(_ id: UUID, archived: Bool = true) {
+        guard let owner = currentHierarchyOwner else { return }
+        classificationStore.update(for: owner) { value in
+            guard let index = value.workspaces.firstIndex(where: { $0.id == id }) else { return }
+            value.workspaces[index].isArchived = archived
+        }
+    }
+    public func recordLineage(child: StoredSessionID, parent: StoredSessionID, kind: SessionLineageKind) {
+        guard let owner = currentHierarchyOwner, child != parent else { return }
+        classificationStore.update(for: owner) { value in
+            value.lineage.removeAll { $0.childSessionID == child }
+            value.lineage.append(SessionLineage(childSessionID: child, parentSessionID: parent, kind: kind))
+        }
+    }
+    public func place(for sessionID: StoredSessionID) -> SessionPlace {
+        hierarchyClassification.places[sessionID.rawValue] ?? SessionPlace()
+    }
+    public func rememberPlace(_ messageID: String?, for sessionID: StoredSessionID) {
+        guard let owner = currentHierarchyOwner else { return }
+        classificationStore.update(for: owner) { $0.places[sessionID.rawValue] = SessionPlace(visibleMessageID: messageID) }
+    }
+    public func markRunRead(_ id: String) {
+        guard let owner = currentHierarchyOwner, let run = runs.first(where: { $0.id == id }),
+              !run.isActive, run.status.isTerminal else { return }
+        classificationStore.update(for: owner) { $0.readRunIDs.insert(id) }
+    }
+    public func markAllActivityRead() {
+        guard let owner = currentHierarchyOwner else { return }
+        let ids = runs.filter { !$0.isActive && $0.status.isTerminal }.map(\.id)
+        classificationStore.update(for: owner) { $0.readRunIDs.formUnion(ids) }
+        // Needs-you requests are decisions, never dismissed by marking updates read.
+    }
+    public func loadRunDetail(_ id: String) async {
+        guard isConnected, let endpoint, let token, let run = runs.first(where: { $0.id == id }),
+              loadingRunIDs.insert(id).inserted else { return }
+        let stamp = generation
+        defer { if stamp == generation { loadingRunIDs.remove(id) } }
+        do {
+            let response: JSONValue
+            if let runDetailLoader { response = try await runDetailLoader(endpoint, token, run) }
+            else { response = try await GatewayReader(endpoint: endpoint, token: token).read(.sessionMessages(id: run.sessionID.rawValue, limit: 40)) }
+            guard stamp == generation else { return }
+            guard let currentRun = runs.first(where: { $0.id == id }) else { return }
+            guard currentRun.isActive == run.isActive, currentRun.endedAt == run.endedAt, currentRun.endReason == run.endReason else {
+                Task { [weak self] in
+                    guard let self, self.generation == stamp else { return }
+                    await self.loadRunDetail(id)
+                }
+                return
+            }
+            guard response["profile"]?.stringValue.map({ $0 == endpoint.profile }) != false,
+                  response["session_id"]?.stringValue.map({ $0 == run.sessionID.rawValue }) != false,
+                  response["messages"]?.arrayValue != nil else { throw MobileActivityError.invalidResponse }
+            var detail = AutomationRunResult.parse(run, response: response)
+            if mobilePendingInputs.contains(where: { $0.sessionID == run.sessionID }) {
+                detail = AutomationRunDetail(runID: id, result: detail.result, messages: detail.messages, status: .waitingForInput,
+                    isHistoryTruncated: detail.isHistoryTruncated)
+            }
+            runDetails[id] = detail
+            if let index = mobileActivity.runs.firstIndex(where: { $0.id == id }) {
+                mobileActivity.runs[index].status = detail.status
+                mobileActivity.runs[index].summary = String(detail.result.prefix(1_200))
+            }
+            markRunRead(id)
+        } catch {
+            guard stamp == generation else { return }
+            hierarchyError = safeDescription(error)
+            if runDetails[id] == nil {
+                runDetails[id] = AutomationRunDetail(runID: id, result: "", messages: [], status: .unavailable, executionAvailable: false)
+            }
+        }
+    }
+    public func setAutomationEnabled(_ id: String, enabled: Bool) async {
+        guard isConnected, let endpoint, let token, automations.contains(where: { $0.id == id }),
+              automationActionIDs.insert(id).inserted else { return }
+        let stamp = generation
+        defer { if generation == stamp { automationActionIDs.remove(id) } }
+        do {
+            _ = try await GatewayReader(endpoint: endpoint, token: token).setAutomationEnabled(id: id, enabled: enabled)
+            guard generation == stamp else { return }
+            await refreshMobileActivity()
+        } catch { if generation == stamp { hierarchyError = safeDescription(error) } }
+    }
+    public func rerunAutomation(_ id: String) async {
+        guard let automation = automations.first(where: { $0.id == id }) else { return }
+        // Hermes force-firing a paused automation also enables its recurring
+        // schedule. Require a separate, explicit Enabled toggle first.
+        guard automation.enabled else { hierarchyError = "Enable this automation before running it."; return }
+        guard isConnected, let endpoint, let token,
+              automationActionIDs.insert(id).inserted else { return }
+        let stamp = generation
+        defer { if generation == stamp { automationActionIDs.remove(id) } }
+        do {
+            _ = try await GatewayReader(endpoint: endpoint, token: token).triggerAutomation(id: id)
+            guard generation == stamp else { return }
+            await refreshMobileActivity()
+            await refreshAutomationRuns(id)
+            scheduleAutomationRefreshes(id, generation: stamp)
+        } catch {
+            if generation == stamp {
+                hierarchyError = "The run request could not be confirmed. Refresh its runs before trying again. " + safeDescription(error)
+                scheduleAutomationRefreshes(id, generation: stamp)
+            }
+        }
+    }
+    /// Stages only chosen content in the destination's draft. The regular Send
+    /// action is still explicit; destination selection never starts a host turn.
+    @discardableResult public func stageResultDiscussion(result: String, runID: String, destination: StoredSessionID,
+                                                         includeResult: Bool = true, includeBacklink: Bool = true) async -> Bool {
+        guard let owner = currentHierarchyOwner else { return false }
+        let stamp = generation
+        var sections: [String] = []
+        if includeResult, !result.isEmpty { sections.append(result.split(separator: "\n", omittingEmptySubsequences: false).map { "> \($0)" }.joined(separator: "\n")) }
+        if includeBacklink {
+            var link = URLComponents(); link.scheme = "talaria"; link.host = "run"; link.path = "/" + runID
+            link.queryItems = [URLQueryItem(name: "connection", value: owner.connectionID.uuidString), URLQueryItem(name: "profile", value: owner.profile)]
+            if let url = link.url { sections.append("[View original run](\(url.absoluteString))") }
+        }
+        guard !sections.isEmpty else { return false }
+        let scope = ComposerScope(owner: owner, sessionID: destination)
+        let current = draftStore.text(for: scope)
+        let quotation = sections.joined(separator: "\n\n")
+        draftStore.setText(current.isEmpty ? quotation : current + "\n\n" + quotation, for: scope)
+        await navigate(to: destination == homeSessionID ? .home : .conversation(destination))
+        guard generation == stamp else { return false }
+        guard selectedID == destination, conversation?.owner == owner else { return false }
+        draft = draftStore.text(for: scope)
+        return true
+    }
+    private func cacheHomeTranscript() {
+        guard let owner = currentHierarchyOwner, let homeSessionID, let state = conversations[homeSessionID] else { return }
+        var retainedBytes = 0
+        let messages = state.messages.suffix(100).reversed().compactMap { message -> ChatMessage? in
+            guard message.role == .user || message.role == .assistant, retainedBytes < 200_000 else { return nil }
+            var copy = message; copy.text = String(copy.text.prefix(8_000)); copy.reasoning = ""; copy.toolInput = nil
+            copy.isStreaming = false; retainedBytes += copy.text.utf8.count; return copy
+        }
+        classificationStore.update(for: owner) { $0.cachedHomeMessages = messages.reversed() }
+    }
+}
+
+extension HermesAppModel {
+    public func workspaceFiles(_ id: UUID) -> [WorkspaceFileReference] {
+        guard let workspace = workspace(id: id) else { return [] }
+        return workspace.sessionIDs.flatMap { sessionID in
+            guard let state = conversations[sessionID] else { return [WorkspaceFileReference]() }
+            return WorkspaceFileReferences.collect(sessionID: sessionID, cwd: state.cwd, messages: state.messages)
+        }
+    }
+}
+
+extension HermesAppModel {
+    /// A focused read, independent of the overview's bounded fan-out. This makes
+    /// every explicitly opened automation usable, including those beyond its first page.
+    public func refreshAutomationRuns(_ id: String) async {
+        guard isConnected, !isLoadingMobileActivity, let endpoint, let token,
+              let automation = automations.first(where: { $0.id == id }),
+              loadingAutomationRunIDs.insert(id).inserted else { return }
+        let stamp = generation
+        defer { if generation == stamp { loadingAutomationRunIDs.remove(id) } }
+        do {
+            let response: JSONValue
+            if let automationRunsLoader { response = try await automationRunsLoader(endpoint, token, id) }
+            else { response = try await GatewayReader(endpoint: endpoint, token: token).read(.scheduleRuns(id: id, limit: 20)) }
+            guard generation == stamp, isConnected else { return }
+            guard response["profile"]?.stringValue.map({ $0 == endpoint.profile }) != false,
+                  let rows = response["runs"]?.arrayValue else { throw MobileActivityError.invalidResponse }
+            var seen = Set<String>()
+            var refreshed = rows.prefix(20).compactMap { MobileRun(json: $0, schedule: automation, profile: endpoint.profile) }
+                .filter { seen.insert($0.id).inserted }
+            guard !refreshed.contains(where: { candidate in
+                runs.contains { $0.id == candidate.id && $0.automationID != id }
+            }) else { throw MobileActivityError.invalidResponse }
+            var changed = Set<String>()
+            for index in refreshed.indices {
+                let current = refreshed[index]
+                if let previous = runs.first(where: { $0.id == current.id }),
+                   previous.isActive == current.isActive, previous.endedAt == current.endedAt, previous.endReason == current.endReason {
+                    refreshed[index].summary = previous.summary; refreshed[index].status = previous.status
+                } else { changed.insert(current.id); runDetails.removeValue(forKey: current.id) }
+            }
+            // Keep the explicitly opened automation visible even when unrelated
+            // overview history already fills the bounded in-memory cache.
+            let retained = mobileActivity.runs.filter { $0.automationID != id }.prefix(400 - refreshed.count)
+            let merged = Array(retained) + refreshed
+            mobileActivity.runs = Array(merged.sorted {
+                if $0.startedAt == $1.startedAt { return $0.id < $1.id }
+                return ($0.startedAt ?? .distantPast) > ($1.startedAt ?? .distantPast)
+            }.prefix(400))
+            if case .run(let selected) = hierarchyDestination, changed.contains(selected) { await loadRunDetail(selected) }
+        } catch {
+            guard generation == stamp, !(error is CancellationError) else { return }
+            hierarchyError = safeDescription(error)
+        }
+    }
+
+    /// Owned by the visible Run view's task. Cancellation stops subsequent reads;
+    /// it never interrupts the backend run. At most one poll every five seconds.
+    public func observeRun(_ id: String) async {
+        let stamp = generation
+        await loadRunDetail(id)
+        for _ in 0..<60 {
+            guard !Task.isCancelled, generation == stamp, isConnected, hierarchyDestination == .run(id),
+                  let run = runs.first(where: { $0.id == id }),
+                  run.isActive || runDetails[id]?.status == .waitingForInput else { return }
+            do { try await Task.sleep(for: .seconds(5)) } catch { return }
+            guard !Task.isCancelled, generation == stamp, hierarchyDestination == .run(id) else { return }
+            await refreshAutomationRuns(run.automationID)
+            guard !Task.isCancelled, generation == stamp, hierarchyDestination == .run(id) else { return }
+            await loadRunDetail(id)
+        }
+    }
+
+    private func scheduleAutomationRefreshes(_ id: String, generation stamp: UUID) {
+        automationRefreshTasks[id]?.cancel()
+        automationRefreshTasks[id] = Task { [weak self] in
+            for seconds in [3, 5] {
+                do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
+                guard let self, !Task.isCancelled, self.generation == stamp, self.isConnected else { return }
+                await self.refreshAutomationRuns(id)
+            }
+        }
     }
 }

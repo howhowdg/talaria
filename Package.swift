@@ -23,6 +23,7 @@ let package = Package(
         .testTarget(name: "HermesProtocolTests", dependencies: ["HermesProtocol"]),
         .testTarget(name: "HermesTransportTests", dependencies: ["HermesTransport", "HermesProtocol"]),
         .testTarget(name: "HermesCoreTests", dependencies: ["HermesCore", "HermesProtocol", "HermesTransport"]),
-        .testTarget(name: "HermesMacServicesTests", dependencies: ["HermesMacServices"])
+        .testTarget(name: "HermesMacServicesTests", dependencies: ["HermesMacServices"]),
+        .testTarget(name: "HermesUITests", dependencies: ["HermesUI", "HermesCore", "HermesProtocol"])
     ]
 )

@@ -20,6 +20,7 @@ public enum GatewayTransportError: Error, LocalizedError, Sendable, Equatable {
     case missingToken
     case interactiveAuthenticationRequired
     case authenticationRejected
+    case hostRejected
     case httpStatus(Int)
     case invalidResponse
     case notConnected
@@ -40,6 +41,8 @@ public enum GatewayTransportError: Error, LocalizedError, Sendable, Equatable {
             "This gateway uses gated authentication and one-use WebSocket tickets. This native preview supports session-token gateways; use a token-mode Hermes serve endpoint. Gated sign-in is not implemented yet."
         case .authenticationRejected:
             "The gateway rejected authentication. Check the session token and gateway configuration."
+        case .hostRejected:
+            "Hermes rejected the gateway hostname. Use the hostname the server was bound to. For an SSH tunnel to Hermes bound to 127.0.0.1, forward to 127.0.0.1 and its listening port on the remote host."
         case .httpStatus(let status):
             "The gateway status request failed (HTTP \(status))."
         case .invalidResponse:

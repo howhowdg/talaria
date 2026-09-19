@@ -20,6 +20,108 @@ public struct HermesRootView: View {
     }
 
     public var body: some View {
+        Group {
+            #if os(macOS)
+            MacWorkspaceView(model: model) {
+                VStack(spacing: 0) {
+                    if model.isConnected, let banner = model.banner { connectionBanner(banner) }
+                    macHierarchyContent
+                }
+                .overlay(alignment: .top) {
+                    if !model.isConnected, model.endpoint != nil {
+                        connectionBanner(model.banner ?? (model.isConnecting ? "Reconnecting…" : "Disconnected"))
+                            .padding(.top, 12).padding(.horizontal, 16)
+                    }
+                }
+            }
+            .talariaWindowBackground()
+            #else
+            IOSWorkspaceView(model: model)
+            #endif
+        }
+        .tint(TalariaStyle.accent)
+        .onOpenURL { url in Task { _ = await model.openHierarchyLink(url) } }
+        .sheet(isPresented: $model.showConnection) { ConnectionView(model: model) }
+        .sheet(isPresented: $model.showSessionSettings) {
+            SessionSettingsView(state: SessionSettingsViewState(snapshot: model.settingsSnapshot,
+                profile: model.endpoint?.profile ?? "default", sessionID: settingsConversation?.runtimeID.rawValue,
+                isLoading: model.isLoadingSettings, isApplying: model.isApplyingSettings || model.isSubmitting || model.conversation?.isRunning == true,
+                errorMessage: model.settingsError, workingDirectory: settingsConversation?.cwd),
+                onRefresh: { await model.loadSettings(refresh: true) },
+                onSelectModel: { selection, confirmed in
+                    guard settingsConversation != nil else { return nil }
+                    return await model.selectModel(selection, confirmed: confirmed)
+                },
+                onSelectProfile: { await model.selectProfile($0) })
+                .task { await model.loadSettings() }
+        }
+        #if os(iOS)
+        .onChange(of: selection) { _, id in
+            if horizontalSizeClass != .compact, let id, id != model.selectedID {
+                Task { await model.openSession(id) }
+            }
+        }
+        .onChange(of: model.selectedID) { _, id in
+            guard horizontalSizeClass != .compact else { return }
+            selection = id
+            if id != nil { preferredColumn = .detail }
+        }
+        #endif
+    }
+
+    /// List and Run destinations retain a selected conversation for drafts, but
+    /// it is not a valid implicit target for an unrelated Settings sheet.
+    private var settingsConversation: ConversationState? {
+        guard let state = model.conversation, state.owner == model.currentHierarchyOwner else { return nil }
+        switch model.hierarchyDestination {
+        case .home: return state.storedID == model.homeSessionID && model.homeAvailability == .available ? state : nil
+        case .workspace(let id): return model.workspace(id: id)?.sessionIDs.contains(state.storedID) == true ? state : nil
+        case .conversation(let id): return id == state.storedID ? state : nil
+        default: return nil
+        }
+    }
+
+    #if os(macOS)
+    @ViewBuilder private var macHierarchyContent: some View {
+        if model.endpoint == nil && !model.isConnected {
+            welcome
+        } else if !model.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            ScrollView {
+                HierarchySearchResults(model: model, onNavigate: navigateHierarchy)
+                    .padding(.horizontal, T.chatInset).padding(.vertical, 24)
+            }
+        } else {
+            switch model.hierarchyDestination {
+            case .home where model.homeAvailability == .available:
+                if let state = model.homeSessionID.flatMap({ model.conversations[$0] }), model.selectedID == state.storedID {
+                    ConversationView(model: model, state: state).id(state.storedID)
+                } else { hierarchyContent }
+            case .workspace(let id):
+                if let workspace = model.workspace(id: id), let state = model.conversation,
+                   workspace.sessionIDs.contains(state.storedID) {
+                    HierarchyWorkspaceHeader(model: model, workspace: workspace, onNavigate: navigateHierarchy)
+                        .padding(.horizontal, T.chatInset).padding(.top, 12)
+                    ConversationView(model: model, state: state).id(state.storedID)
+                } else { hierarchyContent }
+            case .conversation(let id):
+                if let state = model.conversations[id], model.selectedID == id {
+                    HierarchyConversationNotice(model: model, sessionID: id, onNavigate: navigateHierarchy)
+                    ConversationView(model: model, state: state).id(state.storedID)
+                } else { hierarchyContent }
+            default: hierarchyContent
+            }
+        }
+    }
+    private var hierarchyContent: some View {
+        HierarchyContentView(model: model, destination: model.hierarchyDestination, onNavigate: navigateHierarchy)
+    }
+    private func navigateHierarchy(_ destination: HierarchyDestination) {
+        model.searchText = ""
+        Task { await model.navigate(to: destination) }
+    }
+    #endif
+
+    private var mobileNavigation: some View {
         NavigationSplitView(columnVisibility: $columnVisibility, preferredCompactColumn: $preferredColumn) {
             VStack(spacing: 0) {
                 sidebarContent
@@ -60,25 +162,6 @@ public struct HermesRootView: View {
                 }
             }
         }
-        .tint(TalariaStyle.accent)
-        .sheet(isPresented: $model.showConnection) { ConnectionView(model: model) }
-        .sheet(isPresented: $model.showSessionSettings) {
-            SessionSettingsView(state: SessionSettingsViewState(snapshot: model.settingsSnapshot,
-                profile: model.endpoint?.profile ?? "default", sessionID: model.conversation?.runtimeID.rawValue,
-                isLoading: model.isLoadingSettings, isApplying: model.isApplyingSettings || model.isSubmitting,
-                errorMessage: model.settingsError),
-                onRefresh: { await model.loadSettings(refresh: true) },
-                onSelectModel: { selection, confirmed in await model.selectModel(selection, confirmed: confirmed) },
-                onSelectProfile: { await model.selectProfile($0) })
-                .task { await model.loadSettings() }
-        }
-        .onChange(of: selection) { _, id in
-            if let id, id != model.selectedID { Task { await model.openSession(id) } }
-        }
-        .onChange(of: model.selectedID) { _, id in
-            selection = id
-            if id != nil { preferredColumn = .detail }
-        }
     }
 
     private var sidebarContent: some View {
@@ -93,11 +176,11 @@ public struct HermesRootView: View {
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack(spacing: 8) {
                                         Text(model.conversations[session.id]?.title ?? session.displayTitle)
-                                            .font(.body.weight(.medium)).lineLimit(2)
+                                            .font(TalariaTypography.body.weight(.medium)).lineLimit(2)
                                         Spacer(minLength: 0)
                                         if model.conversations[session.id]?.isRunning == true {
                                             Image(systemName: "circle.fill")
-                                                .font(.caption2).foregroundStyle(TalariaStyle.accent)
+                                                .font(TalariaTypography.caption2).foregroundStyle(TalariaStyle.accent)
                                                 .accessibilityLabel("Reply in progress")
                                         }
                                         if model.conversations[session.id]?.pendingInputs.isEmpty == false {
@@ -107,7 +190,7 @@ public struct HermesRootView: View {
                                         }
                                     }
                                     if !session.preview.isEmpty {
-                                        Text(session.preview).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                                        Text(session.preview).font(TalariaTypography.caption).foregroundStyle(.secondary).lineLimit(2)
                                     }
                                 }
                                 .padding(.vertical, 7)
@@ -162,9 +245,9 @@ public struct HermesRootView: View {
                 Button { model.showSessionSettings = true } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "person.crop.rectangle.stack").foregroundStyle(.secondary)
-                        Text(model.endpoint?.profile ?? "default").font(.callout.weight(.medium)).lineLimit(1)
+                        Text(model.endpoint?.profile ?? "default").font(TalariaTypography.callout.weight(.medium)).lineLimit(1)
                         Spacer()
-                        Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.secondary)
+                        Image(systemName: "chevron.up.chevron.down").font(TalariaTypography.caption).foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, 10).frame(minHeight: 44).contentShape(Rectangle())
                 }
@@ -177,9 +260,9 @@ public struct HermesRootView: View {
                     Circle().fill(model.isConnected ? TalariaStyle.accent : Color.secondary)
                         .frame(width: 7, height: 7).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(model.endpoint?.name ?? "Connect to Hermes").font(.callout.weight(.medium)).lineLimit(1)
+                        Text(model.endpoint?.name ?? "Connect to Hermes").font(TalariaTypography.callout.weight(.medium)).lineLimit(1)
                         Text(model.isConnecting ? "Connecting…" : model.isConnected ? "Connected" : "Disconnected")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(TalariaTypography.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Image(systemName: "slider.horizontal.3").foregroundStyle(.secondary)
@@ -193,10 +276,23 @@ public struct HermesRootView: View {
     }
 
     private func connectionBanner(_ message: String) -> some View {
+        #if os(macOS)
+        HStack(spacing: 8) {
+            Circle().fill(T.failed).frame(width: 7, height: 7)
+            Text(message).font(T.f(11.5)).lineLimit(3).textSelection(.enabled)
+            if !model.isConnected, model.endpoint != nil {
+                Button("Retry now") { Task { await model.reconnect() } }
+                    .font(T.f(11.5, .semibold)).buttonStyle(.plain).foregroundStyle(T.deep).disabled(model.isConnecting)
+            } else {
+                Button { model.banner = nil } label: { Image(systemName: "xmark").font(T.f(10)) }
+                    .buttonStyle(.plain).accessibilityLabel("Dismiss notice")
+            }
+        }.padding(.horizontal, 14).padding(.vertical, 10).floatingGlass(18)
+        #else
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "exclamationmark.circle").foregroundStyle(.secondary).padding(.top, 12)
-                Text(message).font(.callout).textSelection(.enabled).padding(.vertical, 10)
+                Text(message).font(TalariaTypography.callout).textSelection(.enabled).padding(.vertical, 10)
                 Spacer(minLength: 0)
                 Button { model.banner = nil } label: {
                     Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
@@ -209,17 +305,35 @@ public struct HermesRootView: View {
         }
         .padding(.horizontal, 16).padding(.bottom, 8)
         .background(.quaternary.opacity(0.35))
+        #endif
     }
 
     private var welcome: some View {
+        #if os(macOS)
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 12) {
+                    TalariaMark(size: 76)
+                    Text(model.isConnected ? "Ready when you are." : "Hermes, made native.")
+                        .font(T.f(25, .medium)).foregroundStyle(T.ink)
+                        .multilineTextAlignment(.center)
+                    Text(model.isConnected ? "Start a conversation, bring a file, and work through your next idea." : "Your Hermes agent, at home on your Mac and iPhone.")
+                        .font(T.body).foregroundStyle(T.ink2).multilineTextAlignment(.center)
+                    connectionActions
+                }
+                .frame(maxWidth: 320).padding(32)
+                .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+            }
+        }
+        #else
         ScrollView {
             VStack(spacing: 24) {
                 TalariaMark(size: 76).accessibilityHidden(true)
                 VStack(spacing: 10) {
                     Text(model.isConnected ? "Ready when you are." : "Hermes, made native.")
-                        .font(.largeTitle.weight(.medium)).multilineTextAlignment(.center)
+                        .font(TalariaTypography.largeTitle.weight(.medium)).multilineTextAlignment(.center)
                     Text(model.isConnected ? "Start a conversation, bring a file, and work through your next idea." : "Your Hermes agent, at home on your Mac and iPhone.")
-                        .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        .font(TalariaTypography.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }
                 connectionActions.frame(maxWidth: 320)
             }
@@ -227,13 +341,22 @@ public struct HermesRootView: View {
             .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #endif
+    }
+
+    private var connectionActionHeight: CGFloat {
+        #if os(macOS)
+        0 // The button style supplies the exact 36pt height.
+        #else
+        44
+        #endif
     }
 
     private var connectionActions: some View {
         VStack(spacing: 12) {
             if model.isConnected {
                 Button { Task { await model.newConversation() } } label: {
-                    Label("New conversation", systemImage: "square.and.pencil").frame(minHeight: 44)
+                    Label("New conversation", systemImage: "square.and.pencil").frame(minHeight: connectionActionHeight)
                 }
                 .talariaProminentButton().disabled(model.isLoadingSession)
             } else {
@@ -242,15 +365,21 @@ public struct HermesRootView: View {
                         startingLocal = true
                         Task { await startLocal(); startingLocal = false }
                     } label: {
-                        Text(startingLocal ? "Starting Hermes…" : "Start local Hermes").frame(minHeight: 44)
+                        Text(startingLocal ? "Starting Hermes…" : "Start local Hermes").frame(minHeight: connectionActionHeight)
                     }
                     .talariaProminentButton().disabled(startingLocal || model.isConnecting)
                 }
                 Button { model.showConnection = true } label: {
-                    Text(model.isConnecting ? "Connecting…" : "Connect to a gateway").frame(minHeight: 44)
+                    Text(model.isConnecting ? "Connecting…" : "Connect to a gateway").frame(minHeight: connectionActionHeight)
                 }.talariaSecondaryButton().disabled(model.isConnecting)
                 Text(startLocal == nil ? "Use Hermes running on your Mac or server." : "Uses your existing Hermes installation and selected model.")
-                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    #if os(macOS)
+                    .font(T.status).foregroundStyle(T.ink3)
+                    #else
+                    .font(TalariaTypography.caption).foregroundStyle(.secondary)
+                    #endif
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -262,12 +391,23 @@ private struct ConversationView: View {
     @State private var followTail = true
     @State private var showImporter = false
     @State private var importScope: ComposerScope?
+    @State private var visibleMessageID: String?
+    @State private var highlightsRequest = false
+    @State private var showsActivityReturn = false
+    #if os(macOS)
+    @State private var composerFocused = false
+    #else
     @FocusState private var composerFocused: Bool
+    #endif
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+    #if os(iOS)
     @ScaledMetric(relativeTo: .body) private var composerHeight: CGFloat = 76
+    #endif
 
     private var contentInset: CGFloat {
         #if os(macOS)
-        24
+        36
         #else
         16
         #endif
@@ -275,53 +415,115 @@ private struct ConversationView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            #if os(iOS)
             HStack(spacing: 12) {
                 Label(state.status, systemImage: state.isRunning ? "sparkles" : "checkmark.circle")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    .font(TalariaTypography.caption).foregroundStyle(.secondary).lineLimit(2)
                 Spacer(minLength: 8)
                 Button { model.showSessionSettings = true } label: {
                     HStack(spacing: 6) {
                         Text(state.model.isEmpty ? "Choose model" : state.model).lineLimit(1)
-                        Image(systemName: "chevron.down").font(.caption2)
+                        Image(systemName: "chevron.down").font(TalariaTypography.caption2)
                     }
-                    .font(.callout).frame(minHeight: 44).contentShape(Rectangle())
+                    .font(TalariaTypography.callout).frame(minHeight: 44).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).disabled(!model.isConnected).help("Model and profile settings")
                 .accessibilityLabel("Model: \(state.model.isEmpty ? "Not selected" : state.model)")
                 .accessibilityHint("Opens model and profile settings")
             }
             .padding(.horizontal, contentInset).padding(.vertical, 4)
+            #endif
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 28) {
+                    LazyVStack(alignment: .leading, spacing: 22) {
                         if state.messages.isEmpty {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text("What are we working on?").font(.title2.weight(.medium))
+                                Text("What are we working on?").font(TalariaTypography.title2.weight(.medium))
                                 Text("Ask a question, share a file, or start with an idea.")
-                                    .font(.body).foregroundStyle(.secondary)
+                                    .font(TalariaTypography.body).foregroundStyle(.secondary)
                             }.padding(.vertical, 40)
                         }
-                        ForEach(state.messages) { message in MessageView(message: message) }
-                        ForEach(state.pendingInputs) { input in
-                            InputRequestView(input: input) { result in
-                                await model.answer(input, result: result)
-                            }.id(input.id)
+                        #if os(macOS)
+                        let groups = macTranscriptGroups
+                        ForEach(groups) { group in
+                            // Keep session-owned cards visually adjacent without
+                            // assigning them a message ID the gateway never sent.
+                            VStack(alignment: .leading, spacing: 8) {
+                                MacTranscriptGroupView(group: group,
+                                    assistantName: model.endpoint?.name ?? "Hermes", workerTask: workerTask)
+                                if group.id == groups.last?.id { sessionCards }
+                            }
                         }
+                        if groups.isEmpty { sessionCards }
+                        #else
+                        ForEach(transcriptGroups) { group in
+                            if group.isToolGroup {
+                                ToolActivityCard(messages: group.messages)
+                            } else if let message = group.messages.first {
+                                MessageView(message: message, assistantName: model.endpoint?.name ?? "Hermes")
+                            }
+                        }
+                        if state.storedID == model.homeSessionID { homeReferences }
+                        requestCards
+                        #endif
                         Color.clear.frame(height: 1).id("tail")
                     }
-                    .frame(maxWidth: 760).padding(.horizontal, contentInset).padding(.vertical, 24)
+                    .scrollTargetLayout()
+                    .frame(maxWidth: 760).padding(.horizontal, contentInset).padding(.top, 24).padding(.bottom, 10)
                     .frame(maxWidth: .infinity)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .scrollPosition(id: $visibleMessageID, anchor: .top)
+                .onChange(of: visibleMessageID) { _, value in
+                    model.rememberPlace(value, for: state.storedID)
+                }
                 .onChange(of: state.messages.last) { _, _ in if followTail { proxy.scrollTo("tail", anchor: .bottom) } }
                 .onChange(of: state.pendingInputs.count) { _, _ in if followTail { proxy.scrollTo("tail", anchor: .bottom) } }
                 .onChange(of: state.storedID) { _, _ in proxy.scrollTo("tail", anchor: .bottom) }
-                .onAppear { proxy.scrollTo("tail", anchor: .bottom) }
+                .onAppear {
+                    if let saved = model.place(for: state.storedID).visibleMessageID {
+                        followTail = false
+                        #if os(macOS)
+                        // Older reading places may point to a tool that now
+                        // lives inside its issuing assistant's turn.
+                        let anchor = macTranscriptGroups.first {
+                            $0.id == saved || $0.tools.contains { $0.id == saved }
+                        }?.id ?? saved
+                        #else
+                        let anchor = saved
+                        #endif
+                        visibleMessageID = anchor
+                        proxy.scrollTo(anchor, anchor: .top)
+                    } else { proxy.scrollTo("tail", anchor: .bottom) }
+                }
+                .task(id: model.activityRequestFocusID) {
+                    guard let requestID = model.activityRequestFocusID,
+                          state.pendingInputs.contains(where: { $0.id == requestID }) else { return }
+                    followTail = false; showsActivityReturn = true; highlightsRequest = true
+                    #if os(macOS)
+                    // Materialize the last lazy row before targeting a request
+                    // inside its auxiliary cards (including a saved place far above).
+                    proxy.scrollTo(macTranscriptGroups.last?.id ?? "tail", anchor: .bottom)
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    #endif
+                    proxy.scrollTo(requestID, anchor: .center)
+                    try? await Task.sleep(for: .seconds(2))
+                    guard !Task.isCancelled else { return }
+                    highlightsRequest = false
+                    try? await Task.sleep(for: .seconds(8))
+                    guard !Task.isCancelled else { return }
+                    showsActivityReturn = false
+                }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             composer
-                .frame(maxWidth: 808).padding(.horizontal, contentInset).padding(.top, 8).padding(.bottom, 12)
+                #if os(macOS)
+                .frame(maxWidth: T.composerMaxW).padding(.horizontal, T.chatInset).padding(.top, 14).padding(.bottom, 18)
+                #else
+                .frame(maxWidth: 760).padding(.horizontal, contentInset).padding(.top, 8).padding(.bottom, 12)
+                #endif
                 .frame(maxWidth: .infinity)
         }
         .onChange(of: state.storedID) { _, _ in composerFocused = true }
@@ -333,105 +535,289 @@ private struct ConversationView: View {
             }
             importScope = nil
         }
+        .environment(\.openURL, OpenURLAction { url in
+            if url.scheme == "talaria" { Task { _ = await model.openHierarchyLink(url) }; return .handled }
+            guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return .discarded }
+            return .systemAction(url)
+        })
     }
 
+    private var homeReferences: some View {
+        HierarchyHomeReferences(model: model, onNavigate: { destination in
+            Task { await model.navigate(to: destination) }
+        })
+    }
+
+    @ViewBuilder private var requestCards: some View {
+        ForEach(state.pendingInputs) { input in
+            VStack(alignment: .leading, spacing: 8) {
+                if showsActivityReturn, input.id == model.activityRequestFocusID {
+                    Button("‹ Back to Activity") { Task { await model.navigate(to: .activity) } }
+                        .font(TalariaTypography.caption).buttonStyle(.plain).foregroundStyle(TalariaStyle.accent)
+                }
+                InputRequestView(input: input) { result in
+                    await model.answer(input, result: result)
+                }
+            }
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(
+                highlightsRequest && input.id == model.activityRequestFocusID
+                    ? TalariaStyle.attention.opacity(0.6) : .clear, lineWidth: 2))
+            .id(input.id)
+        }
+        ForEach(model.requestReceipts(for: state.storedID)) { receipt in
+            RequestReceiptView(receipt: receipt)
+                .id("request-receipt-\(receipt.id)")
+        }
+    }
+
+    #if os(macOS)
+    private var macTranscriptGroups: [MacTranscriptGroup] { MacTranscriptGroup.make(state.messages) }
+
+    @ViewBuilder private var sessionCards: some View {
+        if hasHomeReferences || !state.pendingInputs.isEmpty || !model.requestReceipts(for: state.storedID).isEmpty {
+            MacTranscriptAuxiliary {
+                VStack(alignment: .leading, spacing: 8) {
+                    if hasHomeReferences { homeReferences }
+                    requestCards
+                }
+            }
+        }
+    }
+
+    private var workerTask: String? {
+        guard model.hierarchyFeatures.delegatedTasks,
+              model.hierarchyClassification.lineage.contains(where: {
+                  $0.childSessionID == state.storedID && $0.kind == .delegated
+              }) else { return nil }
+        return state.title
+    }
+
+    private var hasHomeReferences: Bool {
+        guard state.storedID == model.homeSessionID else { return false }
+        return model.hierarchyClassification.lineage.contains { record in
+            record.parentSessionID == state.storedID && (record.kind == .branch || record.kind == .delegated)
+                && model.workspaces.contains { !$0.isArchived && $0.sessionIDs.contains(record.childSessionID) }
+        }
+    }
+    #else
+    private struct TranscriptGroup: Identifiable {
+        let messages: [ChatMessage]
+        var id: String { messages[0].id }
+        var isToolGroup: Bool { messages[0].role == .tool }
+    }
+
+    private var transcriptGroups: [TranscriptGroup] {
+        var groups: [[ChatMessage]] = []
+        for message in state.messages {
+            if message.role == .tool, groups.last?.last?.role == .tool {
+                groups[groups.count - 1].append(message)
+            } else {
+                groups.append([message])
+            }
+        }
+        return groups.map { TranscriptGroup(messages: $0) }
+    }
+
+    #endif
+
+    private var transcriptFont: Font {
+        #if os(macOS)
+        T.body
+        #else
+        .body
+        #endif
+    }
+
+    private var composerSpacing: CGFloat {
+        #if os(macOS)
+        10
+        #else
+        4
+        #endif
+    }
+
+    private var utilityFont: Font {
+        #if os(macOS)
+        T.f(14)
+        #else
+        .body
+        #endif
+    }
+
+    private var utilityColor: Color {
+        #if os(macOS)
+        T.ink2
+        #else
+        .primary
+        #endif
+    }
+
+    private var utilitySize: CGFloat {
+        #if os(macOS)
+        34
+        #else
+        44
+        #endif
+    }
+
+    #if os(macOS)
+    private var modelPillTitle: String {
+        let name = state.model.isEmpty ? "Choose model" : state.model
+        if let effort = model.settingsSnapshot?.reasoningEffort, !effort.isEmpty {
+            return "\(name) · \(effort.capitalized)"
+        }
+        return name
+    }
+
+    private var modelPicker: some View {
+        Menu {
+            Button("Model and profile settings…") { model.showSessionSettings = true }
+        } label: {
+            HStack(spacing: 6) {
+                Text(modelPillTitle).font(T.pill).lineLimit(1).truncationMode(.middle)
+                Image(systemName: "chevron.down").font(T.f(8, .semibold))
+            }
+            .foregroundStyle(T.ink2)
+            .padding(.horizontal, 10).frame(height: 26)
+        }
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
+        .controlGlass(13, opacity: 0.5)
+        .disabled(!model.isConnected)
+        .help("Model and profile settings")
+        .accessibilityLabel("Model: \(state.model.isEmpty ? "Not selected" : state.model)")
+        .accessibilityHint("Opens model and profile settings")
+    }
+    #endif
+
     private var composer: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: composerSpacing) {
             if !model.attachments.isEmpty {
                 AttachmentStrip(items: model.attachments, onRemove: model.removeAttachment)
                     .padding(.horizontal, 12).padding(.top, 12).disabled(model.isSubmitting)
             }
             ZStack(alignment: .topLeading) {
                 if model.draft.isEmpty {
-                    Text("Message Hermes…").font(.body).foregroundStyle(.tertiary)
-                        .padding(.horizontal, 14).padding(.top, 15)
+                    Text(composerPlaceholder).font(transcriptFont)
+                        #if os(macOS)
+                        .foregroundStyle(T.ink4).padding(.horizontal, 4).padding(.top, 2)
+                        #else
+                        .foregroundStyle(.tertiary).padding(.horizontal, 14).padding(.top, 15)
+                        #endif
                         .allowsHitTesting(false).accessibilityHidden(true)
                 }
-                TextEditor(text: $model.draft).font(.body).scrollContentBackground(.hidden)
-                    .frame(height: min(composerHeight, 140)).padding(8).focused($composerFocused)
+                #if os(macOS)
+                MacMessageEditor(text: $model.draft, isFocused: composerFocused,
+                                 onFocusChange: { composerFocused = $0 })
+                    .id(state.storedID)
+                #else
+                TextEditor(text: $model.draft).font(transcriptFont).scrollContentBackground(.hidden)
+                    .frame(height: min(composerHeight, 140)).padding(8)
+                    .focused($composerFocused)
                     .accessibilityLabel("Message Hermes")
+                #endif
             }
             HStack(spacing: 4) {
                 Button {
                     importScope = model.composerScope
                     showImporter = true
                 } label: {
-                    Image(systemName: "paperclip").frame(width: 44, height: 44).contentShape(Rectangle())
+                    Image(systemName: "paperclip").font(utilityFont).foregroundStyle(utilityColor).frame(width: utilitySize, height: utilitySize).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain).disabled(!model.canAttach).accessibilityLabel("Attach files")
                 .help("Upload files to this conversation’s workspace on the Hermes host")
                 Menu {
                     Toggle("Follow replies", isOn: $followTail)
                 } label: {
-                    Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle())
+                    Image(systemName: "ellipsis").font(utilityFont).foregroundStyle(utilityColor).frame(width: utilitySize, height: utilitySize).contentShape(Rectangle())
                 }
                 .menuIndicator(.hidden).buttonStyle(.plain).accessibilityLabel("Conversation options")
+                #if os(macOS)
+                modelPicker
+                #endif
                 Spacer(minLength: 8)
-                if state.isRunning {
+                if state.isRunning && !model.canAnswerPendingText {
                     Button { Task { await model.stop() } } label: {
-                        Label("Stop", systemImage: "stop.fill").font(.callout.weight(.semibold))
+                        Label("Stop", systemImage: "stop.fill")
                             #if os(iOS)
-                            .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
+                            .font(TalariaTypography.callout.weight(.semibold)).labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
                             #else
-                            .frame(minWidth: 52, minHeight: 44)
+                            .labelStyle(.titleAndIcon)
                             #endif
                     }
-                    .talariaSecondaryButton().disabled(!model.isConnected || state.status == "Stopping…")
+                    #if os(macOS)
+                    .talariaProminentButton()
+                    #else
+                    .talariaSecondaryButton()
+                    #endif
+                    .disabled(!model.isConnected || state.status == "Stopping…")
                     .accessibilityLabel("Stop response")
                     .keyboardShortcut(".", modifiers: .command)
                 } else {
-                    Button { Task { await model.send() } } label: {
-                        Label("Send", systemImage: "arrow.up").font(.callout.weight(.semibold))
+                    Button { Task {
+                        if model.canAnswerPendingText { _ = await model.answerPendingText(model.draft) }
+                        else { await model.send() }
+                    } } label: {
+                        Label("Send", systemImage: "arrow.up")
                             #if os(iOS)
-                            .labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
+                            .font(TalariaTypography.callout.weight(.semibold)).labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
                             #else
-                            .frame(minWidth: 52, minHeight: 44)
+                            .labelStyle(.titleAndIcon)
                             #endif
                     }
-                    .talariaProminentButton().disabled(!model.canSend)
+                    .talariaProminentButton().disabled(!model.canSend && !(model.canAnswerPendingText && !model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
                     .accessibilityLabel("Send message")
                     .keyboardShortcut(.return, modifiers: .command)
                 }
             }
+            #if os(iOS)
             .padding(.horizontal, 10).padding(.bottom, 10)
+            #endif
         }
-        .talariaGlass(cornerRadius: 26)
+        #if os(macOS)
+        .padding(.top, 14).padding(.horizontal, 14).padding(.bottom, 10)
+        .controlSize(.regular)
+        #endif
+        .talariaGlass(cornerRadius: 22)
+    }
+
+    private var composerPlaceholder: String {
+        if model.canAnswerPendingText { return "Or answer in words…" }
+        if let workspace = model.workspace(for: state.storedID) { return "Message in \(workspace.name)…" }
+        return "Message \(model.endpoint?.name ?? "Hermes")…"
     }
 }
 
+#if os(iOS)
 private struct MessageView: View {
     let message: ChatMessage
+    var assistantName = "Hermes"
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: message.role == .user ? "person.crop.circle" : message.role == .tool ? "wrench.and.screwdriver" : "sparkle")
-                    .foregroundStyle(.secondary).accessibilityHidden(true)
-                Text(message.role == .user ? "You" : message.role == .tool ? message.toolName ?? "Tool" : "Hermes")
+                if message.role != .user { TalariaMark(size: 15) }
+                Text((message.role == .user ? "You" : assistantName).uppercased())
                     .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                if message.isStreaming { ProgressView().controlSize(.mini).accessibilityLabel("Reply in progress") }
                 Spacer()
             }
             if !message.reasoning.isEmpty {
                 DisclosureGroup("Reasoning") {
-                    Text(message.reasoning).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                    Text(message.reasoning).font(.body).foregroundStyle(.secondary).textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 6)
-                }.font(.caption).foregroundStyle(.secondary)
-            }
-            if message.role == .tool {
-                DisclosureGroup(message.isStreaming ? "Working…" : message.toolSummary ?? "View tool result") {
-                    if let input = message.toolInput { Text(input).padding(.bottom, 8) }
-                    Text(message.text)
                 }
-                .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
-                .padding(14).background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 14))
-            } else if !message.text.isEmpty {
-                MarkdownMessage(text: message.text).font(.body).lineSpacing(5).textSelection(.enabled)
+                .font(TalariaTypography.callout).foregroundStyle(.secondary)
+            }
+            if !message.text.isEmpty || message.isStreaming {
+                MarkdownMessage(text: message.text, isStreaming: message.isStreaming)
+                    .font(.body).lineSpacing(5).textSelection(.enabled)
                     .foregroundStyle(message.isError ? Color.red : .primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }.accessibilityElement(children: .contain)
     }
 }
+
+#endif
 
 private struct ConnectionView: View {
     @Bindable var model: HermesAppModel
@@ -444,6 +830,10 @@ private struct ConnectionView: View {
     @State private var validation: String?
 
     var body: some View {
+        Group {
+            #if os(macOS)
+            macConnection
+            #else
         NavigationStack {
             Form {
                 Section {
@@ -470,7 +860,7 @@ private struct ConnectionView: View {
                     Text("An empty token field reuses this connection’s current or saved token. OAuth gateways are not supported in this preview.")
                 }
                 if let text = validation ?? model.banner {
-                    Section { Text(text).font(.callout).foregroundStyle(.red).textSelection(.enabled) }
+                    Section { Text(text).font(TalariaTypography.callout).foregroundStyle(.red).textSelection(.enabled) }
                 }
                 if model.isConnected {
                     Section {
@@ -493,6 +883,8 @@ private struct ConnectionView: View {
                 }
             }
         }
+            #endif
+        }
         .tint(TalariaStyle.accent)
         .frame(idealWidth: 480, idealHeight: 560)
         .onAppear {
@@ -502,6 +894,39 @@ private struct ConnectionView: View {
         }
         .onDisappear { token = "" }
     }
+
+    #if os(macOS)
+    private var macConnection: some View {
+        SettingsSheet("Connect to Hermes", content: {
+            SettingsSection("Connection", footer: "Connect to your Hermes gateway. Remote connections require HTTPS.") {
+                SettingsRow("Name") { ValueField(text: $name, mono: false) }
+                SettingsRow("Gateway URL") { ValueField(text: $address) }
+                SettingsRow("Profile") { ValueField(text: $profile) }
+            }
+            SettingsSection("Authentication", footer: "Leave the token blank to reuse this connection’s current or saved token.") {
+                SettingsRow("Session token") {
+                    SecureField("Token", text: $token).textFieldStyle(.plain).font(T.f(12.5))
+                        .padding(.horizontal, 9).frame(height: 26).background(T.field, in: RoundedRectangle(cornerRadius: 6))
+                }
+                SettingsRow("Remember in Keychain") {
+                    Toggle("Remember in Keychain", isOn: $remember).labelsHidden().toggleStyle(.switch).controlSize(.mini)
+                }
+            }
+            if let text = validation ?? model.banner {
+                Text(text).font(T.f(11.5)).foregroundStyle(T.failed).textSelection(.enabled)
+            }
+        }, footer: {
+            if model.isConnected {
+                Button("Disconnect", role: .destructive) { Task { await model.disconnect(); dismiss() } }
+                    .buttonStyle(.plain).foregroundStyle(T.failed)
+            }
+            Spacer()
+            Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+            Button(model.isConnecting ? "Connecting…" : "Connect", action: connect)
+                .buttonStyle(.borderedProminent).tint(T.fill).keyboardShortcut(.defaultAction)
+        }).disabled(model.isConnecting).frame(height: 400)
+    }
+    #endif
 
     private func connect() {
         validation = nil

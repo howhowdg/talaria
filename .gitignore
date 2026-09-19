@@ -23,6 +23,9 @@ test-results/
 *.mobileprovision
 *.provisionprofile
 hermes-native-ui-fixture.json
+talaria-*-connection.json
+talaria-telegram-topic-names.json
+talaria-telegram-topic-name-evidence.json
 
 # Local distribution products and diagnostic logs
 *.xcarchive

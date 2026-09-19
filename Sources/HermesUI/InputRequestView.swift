@@ -16,6 +16,9 @@ public struct InputRequestView: View {
     @State private var selections: [String: Set<String>] = [:]
     @State private var submitting = false
     @State private var submissionID: UUID?
+    #if os(iOS)
+    @ScaledMetric private var approvalButtonWidth: CGFloat = 130
+    #endif
 
     public init(input: PendingInput, onAnswer: @escaping @MainActor (JSONValue) async -> Bool) {
         self.input = input
@@ -23,14 +26,33 @@ public struct InputRequestView: View {
     }
 
     public var body: some View {
+        Group {
+            #if os(iOS)
+            if input.method == "approval" {
+                mobileApprovalCard
+            } else {
+                requestCard
+            }
+            #else
+            requestCard
+            #endif
+        }
+        .disabled(submitting)
+        .onChange(of: input.id) { _, _ in reset() }
+        .onDisappear { clearValues() }
+    }
+
+    private var requestCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             Label {
                 Text(title).foregroundStyle(.primary)
             } icon: {
                 Image(systemName: input.method == "clarify" ? "questionmark.bubble" : "lock.shield")
-                    .foregroundStyle(TalariaStyle.accent)
+                    .foregroundStyle(TalariaStyle.attention)
+                    .frame(width: 26, height: 26)
+                    .background(TalariaStyle.attentionTint, in: RoundedRectangle(cornerRadius: 8))
             }
-            .font(.headline)
+            .font(TalariaTypography.headline)
             switch input.method {
             case "approval": approvalBody
             case "clarify": clarificationBody
@@ -44,18 +66,92 @@ public struct InputRequestView: View {
             if submitting {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text("Sending response…").font(.caption).foregroundStyle(.secondary)
+                    Text("Sending response…").font(TalariaTypography.caption).foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(18)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.quaternary, lineWidth: 1))
-        .disabled(submitting)
-        .onChange(of: input.id) { _, _ in reset() }
-        .onDisappear { clearValues() }
+        .background(TalariaStyle.cardSurface.opacity(0.8), in: RoundedRectangle(cornerRadius: requestRadius))
+        .overlay(RoundedRectangle(cornerRadius: requestRadius).stroke(TalariaStyle.cardBorder, lineWidth: 1))
+        .shadow(color: .black.opacity(0.10), radius: 10, y: 6)
     }
+
+    #if os(iOS)
+    private var mobileApprovalCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "lock.shield")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(TalariaStyle.attention)
+                    .frame(width: 34, height: 34)
+                    .background(TalariaStyle.attentionTint, in: RoundedRectangle(cornerRadius: 11))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(nonempty("description") ?? "Permission requested")
+                        .iosFont(15, .semibold)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                    if let tool = nonempty("tool_name") {
+                        Text(tool).iosFont(13).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let requestedCommand = nonempty("command") {
+                ScrollView(.horizontal) {
+                    Text(requestedCommand)
+                        .iosFont(13).monospaced().lineSpacing(5)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(12)
+                .background(Color(uiColor: .label).opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityLabel("Requested command: \(requestedCommand)")
+            }
+            if input.params["smart_denied"]?.boolValue == true {
+                Text("Hermes flagged this command for review. Permission is limited to this attempt.")
+                    .iosFont(13).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            mobileApprovalActions
+            if submitting {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Sending response…").iosFont(12).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .talariaGlass(cornerRadius: 22)
+        .shadow(color: Color(red: 10 / 255, green: 25 / 255, blue: 50 / 255).opacity(0.12), radius: 12, y: 8)
+    }
+
+    private var mobileApprovalActions: some View {
+        VStack(spacing: 8) {
+            ForEach(approvalChoices, id: \.self) { choice in mobileApprovalButton(choice) }
+        }
+    }
+
+    @ViewBuilder private func mobileApprovalButton(_ choice: String) -> some View {
+        let button = Button { answer(.object(["choice": .string(choice)])) } label: {
+            Text(approvalLabel(choice)).iosFont(14, .semibold)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+        }
+        if choice == approvalChoices.first && choice != "deny" {
+            button.talariaProminentButton().frame(maxWidth: .infinity, minHeight: 44)
+        } else {
+            button.talariaSecondaryButton().frame(maxWidth: .infinity, minHeight: 44)
+        }
+    }
+    #endif
 
     private var title: String {
         switch input.method {
@@ -71,18 +167,7 @@ public struct InputRequestView: View {
     }
 
     private var approvalChoices: [String] {
-        let supplied = input.params["choices"]?.arrayValue?.compactMap(\.stringValue)
-        let allowed: [String]
-        if let supplied, !supplied.isEmpty { allowed = supplied }
-        else { allowed = ["once", "session", "always", "deny"] }
-        let smartDenied = input.params["smart_denied"]?.boolValue == true
-        return ["once", "session", "always"].filter { choice in
-            guard allowed.contains(choice) else { return false }
-            if choice == "session" || choice == "always" {
-                guard !smartDenied, input.params["allow_session"]?.boolValue != false else { return false }
-            }
-            return choice != "always" || input.params["allow_permanent"]?.boolValue != false
-        }
+        RequestApprovalChoices.allowed(in: input.params)
     }
 
     private var approvalBody: some View {
@@ -91,7 +176,7 @@ public struct InputRequestView: View {
             command
             if input.params["smart_denied"]?.boolValue == true {
                 Text("Hermes flagged this command for review. Permission is limited to this attempt.")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(TalariaTypography.callout).foregroundStyle(.secondary)
             }
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 10) { approvalButtons }.fixedSize(horizontal: true, vertical: false)
@@ -101,27 +186,32 @@ public struct InputRequestView: View {
     }
 
     @ViewBuilder private var approvalButtons: some View {
-        Button("Deny", role: .cancel) { answer(.object(["choice": .string("deny")])) }
-            .talariaSecondaryButton()
         ForEach(approvalChoices, id: \.self) { choice in
             Button(approvalLabel(choice)) { answer(.object(["choice": .string(choice)])) }
+                #if os(macOS)
+                .buttonStyle(RequestChoiceStyle(prominent: choice == approvalChoices.first && choice != "deny"))
+                #else
                 .talariaSecondaryButton()
+                #endif
         }
     }
 
     private func approvalLabel(_ choice: String) -> String {
-        switch choice {
-        case "once": "Allow once"
-        case "session": "Allow for this session"
-        case "always": "Always allow"
-        default: choice
-        }
+        choice
+    }
+
+    private var requestRadius: CGFloat {
+        #if os(macOS)
+        12
+        #else
+        22
+        #endif
     }
 
     @ViewBuilder private var command: some View {
         if let command = nonempty("command") {
             ScrollView(.horizontal) {
-                Text(command).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                Text(command).font(TalariaTypography.callout.monospaced()).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(10)
@@ -161,16 +251,16 @@ public struct InputRequestView: View {
         VStack(alignment: .leading, spacing: 18) {
             ForEach(questions) { question in
                 VStack(alignment: .leading, spacing: 9) {
-                    Text(question.text).font(.body.weight(.medium)).textSelection(.enabled)
+                    Text(question.text).font(TalariaTypography.body.weight(.medium)).textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                     if let locked = lockedAnswers[question.id] {
                         Label(locked.isEmpty ? "Skipped" : locked, systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.secondary)
-                        Text("Already received by Hermes").font(.caption).foregroundStyle(.secondary)
+                        Text("Already received by Hermes").font(TalariaTypography.caption).foregroundStyle(.secondary)
                     } else {
                         if question.multiple && !question.choices.isEmpty {
                             Text("Choose any that apply, or write your own answer.")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(TalariaTypography.caption).foregroundStyle(.secondary)
                         }
                         ForEach(Array(question.choices.enumerated()), id: \.offset) { _, choice in
                             Button { select(choice, for: question) } label: {
@@ -371,5 +461,45 @@ public struct InputRequestView: View {
         clearValues()
         submissionID = nil
         submitting = false
+    }
+}
+
+/// Preserve the host's option order and labels, while respecting narrower scope
+/// flags. Missing choices never invent a persistent permission grant.
+enum RequestApprovalChoices {
+    static func allowed(in params: JSONValue) -> [String] {
+        let supplied = params["choices"]?.arrayValue?.compactMap(\.stringValue) ?? ["once", "deny"]
+        var seen = Set<String>()
+        return supplied.filter { choice in
+            guard ["once", "session", "always", "deny"].contains(choice), seen.insert(choice).inserted else { return false }
+            if ["session", "always"].contains(choice),
+               params["smart_denied"]?.boolValue == true || params["allow_session"]?.boolValue == false { return false }
+            return choice != "always" || params["allow_permanent"]?.boolValue != false
+        }
+    }
+}
+
+#if os(macOS)
+private struct RequestChoiceStyle: ButtonStyle {
+    let prominent: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(T.f(11, .medium)).foregroundStyle(prominent ? .white : T.deep)
+            .padding(.horizontal, 12).frame(height: 28)
+            .background(prominent ? T.fill : T.card, in: Capsule())
+            .overlay(Capsule().stroke(T.glassHi)).opacity(configuration.isPressed ? 0.8 : 1)
+    }
+}
+#endif
+struct RequestReceiptView: View {
+    let receipt: RequestReceipt
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark").foregroundStyle(TalariaStyle.accent)
+            Text(receipt.summary)
+            Spacer(minLength: 0)
+            Text(receipt.createdAt, style: .time)
+        }.hierarchyFont(H.mobile ? 13 : 11).foregroundStyle(.secondary)
+            .padding(.horizontal, 12).padding(.vertical, H.mobile ? 12 : 8)
+            .hierarchyCard(opacity: 0.45, radius: H.mobile ? 14 : 8)
     }
 }
