@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Simplify the repository documentation around installation, contribution and current preview capabilities.
+- Consolidate maintained technical guides and remove historical design exports and working notes from the current source tree.
+
 ## 0.1.2 — 2026-09-18
 
 - Home, Workspaces, Automations and Activity organise conversations and scheduled results on Mac and iOS.
@@ -28,4 +33,4 @@ Initial public source preview of Talaria for Mac and iPhone/iPad.
 - Pinned gateway contract, generated Swift protocol catalog, unit tests and isolated real-backend integration fixtures.
 - MIT license, Hermes attribution, contributor setup and security reporting.
 
-This preview covers the native conversation workflow. Full desktop parity, complete recovery/background behavior, OAuth/Cloud login, signed distribution and updates remain in development. See [implementation status](IMPLEMENTATION_STATUS.md).
+This initial preview covered the native conversation workflow. See [preview status](docs/status.md) for current capabilities and limitations.
