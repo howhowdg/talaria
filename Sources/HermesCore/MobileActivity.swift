@@ -107,7 +107,7 @@ public struct MobilePendingInput: Identifiable, Equatable, Sendable {
     }
 }
 
-public typealias MobileActivityLoader = @Sendable (GatewayClient, GatewayEndpoint, String) async throws -> MobileActivitySnapshot
+public typealias MobileActivityLoader = @Sendable (GatewayClient, GatewayEndpoint, GatewaySession) async throws -> MobileActivitySnapshot
 
 /// A bounded, read-only view of the host's schedules, run output and installed
 /// skills. Failures remain visible; sample content is never substituted.

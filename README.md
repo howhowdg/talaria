@@ -37,6 +37,8 @@ Use one active sending client per session during this preview. See [current capa
 
 ## Build from source
 
+Source builds support Hermes username/password sign-in on Mac and iOS. Select **Username & password**; **Remember sign-in** saves the session in device-only Keychain, not the password. On Mac, select **SSH** and paste `user@host`. Talaria uses this Mac's SSH key or agent and `~/.ssh/known_hosts`, starts a private Hermes gateway on the SSH host, and obtains its session token automatically. **Advanced → Use running gateway** instead connects to a gateway already listening on a chosen port and path; that gateway may require its own sign-in. Direct remote URLs use HTTPS or a Tailscale 100.64.0.0/10 HTTP address. The 0.1.2 download above supports session tokens only.
+
 Development uses **Xcode 27 / Swift 6.4**. The checked-in project has no external Swift package dependencies.
 
 ```sh

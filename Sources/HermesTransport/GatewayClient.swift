@@ -84,7 +84,25 @@ public actor GatewayClient {
         }
     }
 
+    public func makeSession(to endpoint: GatewayEndpoint, token: String) throws -> GatewaySession {
+        try GatewaySession(endpoint: endpoint, token: token, http: http)
+    }
+
+    public func makeSession(to endpoint: GatewayEndpoint, restored: GatewaySessionSnapshot? = nil,
+                            onChange: (@Sendable (GatewaySessionSnapshot?) async -> Void)? = nil) throws -> GatewaySession {
+        try GatewaySession(endpoint: endpoint, token: nil, restored: restored, onChange: onChange, http: http)
+    }
+
+    public func connect(to endpoint: GatewayEndpoint, session: GatewaySession) async throws {
+        guard session.endpoint == endpoint else { throw GatewayTransportError.invalidEndpoint }
+        try await connect(to: endpoint, token: nil, session: session)
+    }
+
     public func connect(to endpoint: GatewayEndpoint, token: String?) async throws {
+        try await connect(to: endpoint, token: token, session: nil)
+    }
+
+    private func connect(to endpoint: GatewayEndpoint, token: String?, session: GatewaySession?) async throws {
         // Validation happens before replacing a usable connection.
         let routes = try GatewayRoutes(endpoint: endpoint)
         let oldSocket = socket
@@ -98,23 +116,31 @@ public actor GatewayClient {
             await oldSocket?.close()
             try checkGeneration(connectionGeneration)
             try Task.checkCancellation()
-            let response = try await http.data(for: routes.statusRequest(token: token))
+            let socketRequest: URLRequest
+            if let session {
+                socketRequest = try await session.socketRequest()
+            } else {
+                let response = try await http.data(for: routes.statusRequest(token: token))
+                try checkGeneration(connectionGeneration)
+                guard response.status != 401 && response.status != 403 else {
+                    throw GatewayTransportError.authenticationRejected
+                }
+                if response.status == 400, Self.isKnownHostRejection(response.data) {
+                    throw GatewayTransportError.hostRejected
+                }
+                guard (200..<300).contains(response.status) else { throw GatewayTransportError.httpStatus(response.status) }
+                let status = try JSONDecoder().decode(JSONValue.self, from: response.data)
+                guard status.objectValue != nil else { throw GatewayTransportError.invalidResponse }
+                if status["auth_required"]?.boolValue == true {
+                    throw GatewayTransportError.interactiveAuthenticationRequired
+                }
+                guard let token, !token.isEmpty else { throw GatewayTransportError.missingToken }
+                try Task.checkCancellation()
+                socketRequest = try routes.socketRequest(token: token)
+            }
             try checkGeneration(connectionGeneration)
-            guard response.status != 401 && response.status != 403 else {
-                throw GatewayTransportError.authenticationRejected
-            }
-            if response.status == 400, Self.isKnownHostRejection(response.data) {
-                throw GatewayTransportError.hostRejected
-            }
-            guard (200..<300).contains(response.status) else { throw GatewayTransportError.httpStatus(response.status) }
-            let status = try JSONDecoder().decode(JSONValue.self, from: response.data)
-            guard status.objectValue != nil else { throw GatewayTransportError.invalidResponse }
-            if status["auth_required"]?.boolValue == true {
-                throw GatewayTransportError.interactiveAuthenticationRequired
-            }
-            guard let token, !token.isEmpty else { throw GatewayTransportError.missingToken }
             try Task.checkCancellation()
-            let newSocket = makeSocket(try routes.socketRequest(token: token))
+            let newSocket = makeSocket(socketRequest)
             socket = newSocket
             receiver = Task { [weak self] in
                 await self?.receiveFrames(from: newSocket, generation: connectionGeneration)
@@ -481,7 +507,7 @@ public actor GatewayClient {
     }
 
     private func removeSubscriber(_ id: UUID) { subscribers.removeValue(forKey: id) }
-    private static func isKnownHostRejection(_ data: Data) -> Bool {
+    static func isKnownHostRejection(_ data: Data) -> Bool {
         // Recognize only Hermes's exact diagnostic, in a small JSON response.
         // Never display arbitrary server text or change Host/authentication policy.
         struct StatusFailure: Decodable { let detail: String }

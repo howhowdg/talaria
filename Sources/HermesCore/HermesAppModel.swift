@@ -8,6 +8,8 @@ public final class HermesAppModel {
     public private(set) var endpoint: GatewayEndpoint?
     public private(set) var isConnected = false
     public private(set) var isConnecting = false
+    public private(set) var desiredConnection = false
+    public private(set) var remembersSignIn = false
     public private(set) var isLoadingSession = false
     public private(set) var sessions: [SessionSummary] = []
     public private(set) var conversations: [StoredSessionID: ConversationState] = [:]
@@ -59,11 +61,14 @@ public final class HermesAppModel {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let draftStore: DraftStore
     @ObservationIgnored private let sender: AttachmentSender
-    @ObservationIgnored private let credentials = CredentialStore()
+    @ObservationIgnored private let credentials: CredentialStore
+    @ObservationIgnored private var session: GatewaySession?
     @ObservationIgnored private var receiver: Task<Void, Never>?
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private var hierarchyNavigationRevision = 0
     @ObservationIgnored private var token: String?
+    @ObservationIgnored private var activeEndpoint: GatewayEndpoint?
+    @ObservationIgnored private var sshReconnectHandler: (@MainActor () async throws -> (GatewayEndpoint, String?))?
     @ObservationIgnored private var uploadedAttachments: [UUID: UploadedAttachment] = [:]
     @ObservationIgnored private var attachmentWorkspaces: [UUID: String] = [:]
     @ObservationIgnored private var backgroundHydrations = Set<StoredSessionID>()
@@ -85,11 +90,13 @@ public final class HermesAppModel {
 
     public init(defaults: UserDefaults = .standard, draftStore: DraftStore? = nil,
                 sender: AttachmentSender = AttachmentSender(),
+                credentials: CredentialStore = CredentialStore(),
                 mobileActivityLoader: MobileActivityLoader? = nil,
                 runDetailLoader: AutomationRunDetailLoader? = nil,
                 automationRunsLoader: AutomationRunsLoader? = nil,
                 telegramTopicsLoader: TelegramTopicsLoader? = nil,
                 clientFactory: @escaping @MainActor () -> GatewayClient = { GatewayClient() }) {
+        self.credentials = credentials
         self.classificationStore = HierarchyClassificationStore(defaults: defaults)
         self.defaults = defaults; self.draftStore = draftStore ?? DraftStore(); self.sender = sender
         self.clientFactory = clientFactory; client = clientFactory()
@@ -99,6 +106,7 @@ public final class HermesAppModel {
         self.telegramTopicsLoader = telegramTopicsLoader
         if let data = defaults.data(forKey: "gateway.endpoint") {
             savedEndpoint = try? JSONDecoder().decode(GatewayEndpoint.self, from: data)
+            remembersSignIn = defaults.object(forKey: "gateway.remember") as? Bool ?? (savedEndpoint != nil)
         }
     }
 
@@ -108,15 +116,15 @@ public final class HermesAppModel {
     }
 
     public func refreshMobileActivity() async {
-        guard isConnected, !isLoadingMobileActivity, loadingAutomationRunIDs.isEmpty, let endpoint, let token else { return }
+        guard isConnected, !isLoadingMobileActivity, loadingAutomationRunIDs.isEmpty, let endpoint, let session else { return }
         let stamp = generation
         mobileActivityRevision += 1; let revision = mobileActivityRevision
         let client = client; let loader = mobileActivityLoader
         isLoadingMobileActivity = true; mobileActivityError = nil
         let task = Task {
-            if let loader { return try await loader(client, endpoint, token) }
+            if let loader { return try await loader(client, endpoint, session) }
             return try await MobileActivityService(client: client,
-                reader: GatewayReader(endpoint: endpoint, token: token)).load(profile: endpoint.profile)
+                reader: GatewayReader(session: session)).load(profile: endpoint.profile)
         }
         mobileActivityTask = task
         defer {
@@ -194,14 +202,50 @@ public final class HermesAppModel {
             && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty)
     }
 
-    public func connect(to endpoint: GatewayEndpoint, token suppliedToken: String?, remember: Bool = false) async {
+    public func connect(to endpoint: GatewayEndpoint, token: String?, remember: Bool = false) async {
+        await connect(to: endpoint, configuredEndpoint: endpoint, token: token, username: nil, password: nil, remember: remember)
+    }
+
+    public func connect(to endpoint: GatewayEndpoint, username: String, password: String, remember: Bool) async {
+        await connect(to: endpoint, configuredEndpoint: endpoint, token: nil, username: username, password: password, remember: remember)
+    }
+
+    public func connect(to activeEndpoint: GatewayEndpoint, configuredEndpoint: GatewayEndpoint,
+                        token: String?, remember: Bool = false) async {
+        await connect(to: activeEndpoint, configuredEndpoint: configuredEndpoint, token: token,
+                      username: nil, password: nil, remember: remember)
+    }
+
+    public func connect(to activeEndpoint: GatewayEndpoint, configuredEndpoint: GatewayEndpoint,
+                        username: String, password: String, remember: Bool) async {
+        await connect(to: activeEndpoint, configuredEndpoint: configuredEndpoint, token: nil,
+                      username: username, password: password, remember: remember)
+    }
+
+    public func setSSHReconnectHandler(_ handler: (@MainActor () async throws -> (GatewayEndpoint, String?))?) {
+        sshReconnectHandler = handler
+    }
+
+    private func connect(to active: GatewayEndpoint, configuredEndpoint endpoint: GatewayEndpoint,
+                         token suppliedToken: String?, username: String?, password: String?, remember: Bool) async {
         guard !isConnecting, !isApplyingSettings else { return }
+        guard active.id == endpoint.id, active.profile == endpoint.profile,
+              active.authentication == endpoint.authentication,
+              (endpoint.ssh == nil || active.baseURL.host == "127.0.0.1" || active.baseURL.host == "localhost") else {
+            banner = GatewayTransportError.invalidEndpoint.localizedDescription; return
+        }
         let sameHost = self.endpoint?.id == endpoint.id && self.endpoint?.baseURL == endpoint.baseURL
+            && self.endpoint?.authentication == endpoint.authentication && self.endpoint?.ssh == endpoint.ssh
         let sameConnection = self.endpoint?.id == endpoint.id
             && self.endpoint?.baseURL == endpoint.baseURL && self.endpoint?.profile == endpoint.profile
+            && self.endpoint?.ssh == endpoint.ssh
         let owner = SessionOwner(connectionID: endpoint.id, profile: endpoint.profile)
         let previous = sameConnection ? selectedID : draftStore.selectedSession(for: owner)
         let previousToken = sameHost ? token : nil
+        let previousSession = sameHost ? session : nil
+        let oldSession = session
+        desiredConnection = true; remembersSignIn = remember
+        defaults.set(remember, forKey: "gateway.remember")
         let stamp = UUID(); generation = stamp
         resetMobileActivity(for: endpoint, preserveLoaded: sameConnection)
         releaseSnapshotWaiters()
@@ -212,9 +256,13 @@ public final class HermesAppModel {
         let oldClient = client
         let client = clientFactory(); self.client = client
         await oldClient.disconnect()
+        let restoredInMemory = await previousSession?.snapshot()
+        await oldSession?.clear()
         guard generation == stamp else { return }
+        session = nil
         selectedID = nil
         self.endpoint = endpoint
+        self.activeEndpoint = active
         telegramTopics = []; telegramTopicsError = nil; hasLoadedTelegramTopics = false
         isLoadingTelegramTopics = false; hierarchyFeatures.telegramBindings = false
         hierarchyDestination = .home
@@ -228,11 +276,44 @@ public final class HermesAppModel {
         backgroundHydrations = []
         if !sameConnection { sessions = [] }
         do {
-            let selectedToken: String?
-            if let suppliedToken, !suppliedToken.isEmpty { selectedToken = suppliedToken }
-            else if let previousToken { selectedToken = previousToken }
-            else { selectedToken = try credentials.read(account: endpoint.id.uuidString) }
-            token = selectedToken
+            let connectionSession: GatewaySession
+            if endpoint.authentication == .basic {
+                let restored = try restoredInMemory ?? credentials.readSession(for: endpoint)
+                if !remember {
+                    try credentials.deleteSession(for: endpoint)
+                    try credentials.deleteToken(for: endpoint)
+                }
+                let onChange: @Sendable (GatewaySessionSnapshot?) async -> Void = { [weak self] snapshot in
+                    await self?.persistSession(snapshot, endpoint: endpoint, generation: stamp)
+                }
+                if endpoint.ssh != nil {
+                    connectionSession = try GatewaySession(endpoint: active, credentialEndpoint: endpoint,
+                                                           restored: restored, onChange: onChange)
+                } else {
+                    connectionSession = try await client.makeSession(to: active, restored: restored, onChange: onChange)
+                }
+                guard generation == stamp else { await connectionSession.clear(); return }
+                session = connectionSession; token = nil
+                if let password, !password.isEmpty {
+                    try await connectionSession.login(username: username ?? "", password: password)
+                } else {
+                    try await connectionSession.validate()
+                }
+            } else {
+                let selectedToken: String?
+                if let suppliedToken, !suppliedToken.isEmpty { selectedToken = suppliedToken }
+                else if let previousToken { selectedToken = previousToken }
+                else { selectedToken = try credentials.readToken(for: endpoint, legacyEndpoint: savedEndpoint) }
+                token = selectedToken
+                if !remember {
+                    try credentials.deleteToken(for: endpoint)
+                    try credentials.deleteSession(for: endpoint)
+                }
+                connectionSession = try await client.makeSession(to: active, token: selectedToken ?? "")
+                guard generation == stamp else { await connectionSession.clear(); return }
+                session = connectionSession
+            }
+            guard generation == stamp else { await connectionSession.clear(); return }
             let updates = await client.updates()
             receiver = Task { [weak self] in
                 for await update in updates {
@@ -240,12 +321,16 @@ public final class HermesAppModel {
                     await self.handle(update, generation: stamp)
                 }
             }
-            try await client.connect(to: endpoint, token: selectedToken)
+            try await client.connect(to: active, session: connectionSession)
             guard generation == stamp else { return }
             isConnected = true; isConnecting = false; showConnection = false
             if remember {
                 do {
-                    try credentials.save(selectedToken ?? "", account: endpoint.id.uuidString)
+                    if endpoint.authentication == .basic {
+                        let snapshot = await connectionSession.snapshot()
+                        guard generation == stamp else { return }
+                        if let snapshot { try credentials.saveSession(snapshot, for: endpoint) }
+                    } else { try credentials.saveToken(token ?? "", for: endpoint) }
                     defaults.set(try JSONEncoder().encode(endpoint), forKey: "gateway.endpoint")
                     savedEndpoint = endpoint
                 } catch { banner = "Connected, but the connection could not be saved to Keychain." }
@@ -267,26 +352,75 @@ public final class HermesAppModel {
     }
 
     public func reconnect() async {
-        if let endpoint { await connect(to: endpoint, token: token) }
-        else { showConnection = true }
+        guard let endpoint else { showConnection = true; return }
+        if endpoint.ssh != nil {
+            guard let sshReconnectHandler else { showConnection = true; return }
+            do {
+                let (active, freshToken) = try await sshReconnectHandler()
+                await connect(to: active, configuredEndpoint: endpoint, token: freshToken ?? token, remember: remembersSignIn)
+            } catch { banner = safeDescription(error) }
+        } else { await connect(to: endpoint, token: token, remember: remembersSignIn) }
     }
 
     public func persistDrafts() {
         do { try draftStore.flush() } catch { banner = draftStore.lastError }
     }
 
-    public func disconnect() async {
+    public func sshTunnelExited() async {
+        guard endpoint?.ssh != nil, desiredConnection else { return }
         generation = UUID(); receiver?.cancel(); refreshTask?.cancel()
+        isConnected = false; isConnecting = false
+        resetMobileActivity(preserveLoaded: true)
+        releaseSnapshotWaiters(); cancelAttachmentTransfers()
+        pendingRequests = [:]
+        for id in conversations.keys { conversations[id]?.pendingInputs = [] }
+        banner = "SSH connection closed. Reconnect to restore the session."
+        await session?.suspend()
+        await client.disconnect()
+    }
+
+    public func disconnect() async {
+        desiredConnection = false
+        isConnected = false; isConnecting = false
+        let oldSession = session; session = nil; token = nil; activeEndpoint = nil
+        let stamp = UUID(); generation = stamp; receiver?.cancel(); refreshTask?.cancel()
         resetMobileActivity(preserveLoaded: true)
         releaseSnapshotWaiters()
         cancelAttachmentTransfers()
         do { try draftStore.flush() } catch { banner = draftStore.lastError }
         let client = client
         await client.disconnect()
+        await oldSession?.clear()
+        guard generation == stamp else { return }
         isConnected = false; isConnecting = false; isLoadingSession = false
         isApplyingSettings = false; isLoadingSettings = false
         pendingRequests = [:]
         for id in conversations.keys { conversations[id]?.pendingInputs = [] }
+    }
+
+    public func signOut() async {
+        let signedOutEndpoint = endpoint
+        let oldSession = session
+        // Invalidate callbacks before logout so its clearing response cannot save again.
+        remembersSignIn = false; desiredConnection = false; generation = UUID()
+        defaults.set(false, forKey: "gateway.remember")
+        session = nil
+        if let signedOutEndpoint {
+            do {
+                try credentials.deleteSession(for: signedOutEndpoint)
+                try credentials.deleteToken(for: signedOutEndpoint)
+            } catch { banner = "Sign-in could not be removed from Keychain." }
+        }
+        await disconnect()
+        await oldSession?.logout()
+    }
+
+    private func persistSession(_ snapshot: GatewaySessionSnapshot?, endpoint: GatewayEndpoint, generation stamp: UUID) {
+        guard generation == stamp, remembersSignIn else { return }
+        do {
+            if let snapshot { try credentials.saveSession(snapshot, for: endpoint) }
+            else { try credentials.deleteSession(for: endpoint) }
+        } catch { banner = "Connected, but sign-in could not be saved to Keychain." }
     }
 
     public func refreshSessions() async {
@@ -496,15 +630,20 @@ public final class HermesAppModel {
             return false
         }
         target.profile = profile
-        let remember = savedEndpoint?.id == target.id && savedEndpoint?.baseURL == target.baseURL
-        await connect(to: target, token: token, remember: remember)
+        let remember = remembersSignIn
+        if var active = activeEndpoint {
+            active.profile = profile
+            await connect(to: active, configuredEndpoint: target, token: token, remember: remember)
+        } else {
+            await connect(to: target, token: token, remember: remember)
+        }
         if isConnected, endpoint?.profile == profile { await loadSettings(); return true }
         settingsError = banner ?? "The profile could not be connected."
         return false
     }
 
     public func addAttachments(_ urls: [URL], to scope: ComposerScope) async {
-        guard canAttach, composerScope == scope, let endpoint, let token, let state = conversation,
+        guard canAttach, composerScope == scope, let endpoint, let session, let state = conversation,
               importingScopes.insert(scope).inserted else { return }
         defer { importingScopes.remove(scope) }
         let count = attachmentDrafts[scope]?.count ?? 0
@@ -528,7 +667,7 @@ public final class HermesAppModel {
                     guard bytes + staged.byteCount <= AttachmentLoader.maximumBatchBytes else { throw AttachmentError.tooManyFiles }
                     self.updateAttachment(scope, item: AttachmentItem(id: id, filename: staged.filename,
                         kind: staged.kind, byteCount: staged.byteCount, state: .uploading, destination: endpoint.name))
-                    let result = try await AttachmentTransferService().upload(staged, workspace: workspace, endpoint: endpoint, token: token)
+                    let result = try await AttachmentTransferService().upload(staged, workspace: workspace, session: session)
                     guard self.generation == stamp, !Task.isCancelled,
                           self.attachmentDrafts[scope]?.contains(where: { $0.id == id }) == true else { return }
                     guard self.conversations[scope.storedSessionID]?.cwd == workspace else {
@@ -826,15 +965,15 @@ public final class HermesAppModel {
 extension HermesAppModel {
     /// Capability discovery is read-only. Only an explicit import creates organisation.
     public func refreshTelegramTopics() async {
-        guard isConnected, let endpoint, let token else { return }
+        guard isConnected, let endpoint, let session else { return }
         let stamp = generation
         telegramTopicsRevision += 1; let revision = telegramTopicsRevision
         isLoadingTelegramTopics = true; telegramTopicsError = nil
         defer { if generation == stamp, telegramTopicsRevision == revision { isLoadingTelegramTopics = false } }
         do {
             let response: JSONValue
-            if let telegramTopicsLoader { response = try await telegramTopicsLoader(endpoint, token) }
-            else { response = try await GatewayReader(endpoint: endpoint, token: token).read(.telegramTopics) }
+            if let telegramTopicsLoader { response = try await telegramTopicsLoader(endpoint, session) }
+            else { response = try await GatewayReader(session: session).read(.telegramTopics) }
             let snapshot = try TelegramTopicsSnapshot(json: response, expectedProfile: endpoint.profile)
             guard generation == stamp, revision == telegramTopicsRevision, isConnected,
                   let owner = currentHierarchyOwner else { return }
@@ -1129,14 +1268,14 @@ extension HermesAppModel {
         // Needs-you requests are decisions, never dismissed by marking updates read.
     }
     public func loadRunDetail(_ id: String) async {
-        guard isConnected, let endpoint, let token, let run = runs.first(where: { $0.id == id }),
+        guard isConnected, let endpoint, let session, let run = runs.first(where: { $0.id == id }),
               loadingRunIDs.insert(id).inserted else { return }
         let stamp = generation
         defer { if stamp == generation { loadingRunIDs.remove(id) } }
         do {
             let response: JSONValue
-            if let runDetailLoader { response = try await runDetailLoader(endpoint, token, run) }
-            else { response = try await GatewayReader(endpoint: endpoint, token: token).read(.sessionMessages(id: run.sessionID.rawValue, limit: 40)) }
+            if let runDetailLoader { response = try await runDetailLoader(endpoint, session, run) }
+            else { response = try await GatewayReader(session: session).read(.sessionMessages(id: run.sessionID.rawValue, limit: 40)) }
             guard stamp == generation else { return }
             guard let currentRun = runs.first(where: { $0.id == id }) else { return }
             guard currentRun.isActive == run.isActive, currentRun.endedAt == run.endedAt, currentRun.endReason == run.endReason else {
@@ -1169,12 +1308,12 @@ extension HermesAppModel {
         }
     }
     public func setAutomationEnabled(_ id: String, enabled: Bool) async {
-        guard isConnected, let endpoint, let token, automations.contains(where: { $0.id == id }),
+        guard isConnected, let endpoint, let session, automations.contains(where: { $0.id == id }),
               automationActionIDs.insert(id).inserted else { return }
         let stamp = generation
         defer { if generation == stamp { automationActionIDs.remove(id) } }
         do {
-            _ = try await GatewayReader(endpoint: endpoint, token: token).setAutomationEnabled(id: id, enabled: enabled)
+            _ = try await GatewayReader(session: session).setAutomationEnabled(id: id, enabled: enabled)
             guard generation == stamp else { return }
             await refreshMobileActivity()
         } catch { if generation == stamp { hierarchyError = safeDescription(error) } }
@@ -1184,12 +1323,12 @@ extension HermesAppModel {
         // Hermes force-firing a paused automation also enables its recurring
         // schedule. Require a separate, explicit Enabled toggle first.
         guard automation.enabled else { hierarchyError = "Enable this automation before running it."; return }
-        guard isConnected, let endpoint, let token,
+        guard isConnected, let endpoint, let session,
               automationActionIDs.insert(id).inserted else { return }
         let stamp = generation
         defer { if generation == stamp { automationActionIDs.remove(id) } }
         do {
-            _ = try await GatewayReader(endpoint: endpoint, token: token).triggerAutomation(id: id)
+            _ = try await GatewayReader(session: session).triggerAutomation(id: id)
             guard generation == stamp else { return }
             await refreshMobileActivity()
             await refreshAutomationRuns(id)
@@ -1251,15 +1390,15 @@ extension HermesAppModel {
     /// A focused read, independent of the overview's bounded fan-out. This makes
     /// every explicitly opened automation usable, including those beyond its first page.
     public func refreshAutomationRuns(_ id: String) async {
-        guard isConnected, !isLoadingMobileActivity, let endpoint, let token,
+        guard isConnected, !isLoadingMobileActivity, let endpoint, let session,
               let automation = automations.first(where: { $0.id == id }),
               loadingAutomationRunIDs.insert(id).inserted else { return }
         let stamp = generation
         defer { if generation == stamp { loadingAutomationRunIDs.remove(id) } }
         do {
             let response: JSONValue
-            if let automationRunsLoader { response = try await automationRunsLoader(endpoint, token, id) }
-            else { response = try await GatewayReader(endpoint: endpoint, token: token).read(.scheduleRuns(id: id, limit: 20)) }
+            if let automationRunsLoader { response = try await automationRunsLoader(endpoint, session, id) }
+            else { response = try await GatewayReader(session: session).read(.scheduleRuns(id: id, limit: 20)) }
             guard generation == stamp, isConnected else { return }
             guard response["profile"]?.stringValue.map({ $0 == endpoint.profile }) != false,
                   let rows = response["runs"]?.arrayValue else { throw MobileActivityError.invalidResponse }

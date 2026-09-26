@@ -39,12 +39,18 @@ Mac uses a sidebar, conversation pane and Context/Files/Terminal inspector. iOS
 uses Home, Workspaces, Automations and Activity tabs, with Skills and Settings in
 the profile menu. Both support light/dark appearance and accessibility fallbacks.
 
+## Unreleased source changes
+
+- Username/password sign-in for Hermes's `basic` provider on macOS and iOS, including shared authentication for chat, activity and uploads. Optional device-only Keychain sessions support reconnect; passwords are not saved.
+- Mac SSH connection with key/agent authentication and strict host-key checking. It starts a separate loopback-only Hermes gateway and adopts its token by default; Advanced can forward an existing gateway that may require Basic sign-in. Talaria cleans up its own tunnel and remote process.
+- Explicit disconnect stays disconnected when iOS returns to the foreground.
+
 ## Important limits
 
 - Hermes and Python are not bundled or installed by Talaria. iOS connects to a
-  host and does not run the agent locally. Remote gateways require HTTPS;
-  unencrypted HTTP is accepted only on loopback. Gated OAuth/Cloud sign-in and
-  managed SSH tunnel startup are not implemented.
+  host and does not run the agent locally. Remote gateways require HTTPS except
+  for Tailscale 100.64.0.0/10 IP addresses. HTTP also works on loopback. Gated OAuth/Cloud sign-in and
+  SSH on iOS are not implemented.
 - Organisation and drafts do not sync across devices. A confirmed missing Home
   retains a bounded cached transcript with its composer disabled. Titles,
   recency and backend parent IDs never assign Home or Workspace membership.
