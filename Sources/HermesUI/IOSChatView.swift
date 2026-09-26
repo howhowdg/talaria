@@ -18,12 +18,28 @@ struct IOSChatView: View {
     @State private var importScope: ComposerScope?
     @State private var composerHeight: CGFloat = 52
     @State private var followTail = true
+    @State private var awaitsInitialMessages = false
+    @State private var initialSavedPlace: String?
     @State private var visibleMessageID: String?
     @State private var highlightsRequest = false
     @State private var showsActivityReturn = false
     @FocusState private var focused: Bool
 
     private var bottomInset: CGFloat { keyboardVisible ? 12 : 84 }
+
+    private func restoreSavedPlace(using proxy: ScrollViewProxy) {
+        guard let saved = initialSavedPlace else { return }
+        guard let anchor = groups.first(where: { $0.messages.contains { $0.id == saved } })?.id else {
+            guard !state.messages.isEmpty, !model.isLoadingChannelHistory else { return }
+            if model.isViewingChannel && model.channelHistoryHasMore {
+                if model.channelHistoryError == nil { Task { await model.loadOlderChannelMessages() } }
+            } else { initialSavedPlace = nil }
+            return
+        }
+        visibleMessageID = anchor
+        proxy.scrollTo(anchor, anchor: .top)
+        initialSavedPlace = nil
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -32,8 +48,9 @@ struct IOSChatView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 14) {
                             contextHeader
+                            ChannelHistoryControls(model: model)
                             if let banner = model.banner { notice(banner) }
-                            if state.messages.isEmpty {
+                            if state.messages.isEmpty && !model.isPassiveChannel {
                                 Text("What are we working on?").iosFont(24, .semibold, relativeTo: .title2)
                                 Text("Ask a question, share a file, or start with an idea.")
                                     .iosFont(16).foregroundStyle(.secondary)
@@ -83,32 +100,46 @@ struct IOSChatView: View {
                     .scrollDismissesKeyboard(.interactively)
                     .scrollPosition(id: $visibleMessageID, anchor: .top)
                     .simultaneousGesture(DragGesture(minimumDistance: 12).onChanged { _ in followTail = false })
-                    .onAppear {
-                        if let saved = model.place(for: state.storedID).visibleMessageID {
-                            followTail = false
-                            proxy.scrollTo(saved, anchor: .top)
-                        } else { proxy.scrollTo("tail", anchor: .bottom) }
+                    .task(id: state.storedID) {
+                        focused = false
+                        initialSavedPlace = model.place(for: state.storedID).visibleMessageID
+                        followTail = initialSavedPlace == nil && !model.isPassiveChannel
+                        visibleMessageID = nil
+                        awaitsInitialMessages = state.messages.isEmpty
+                        await Task.yield()
+                        guard !Task.isCancelled else { return }
+                        guard !state.pendingInputs.contains(where: { $0.id == model.activityRequestFocusID }) else {
+                            awaitsInitialMessages = false
+                            initialSavedPlace = nil
+                            return
+                        }
+                        if !awaitsInitialMessages {
+                            if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                            else { proxy.scrollTo("tail", anchor: .bottom) }
+                        }
                     }
                     .onChange(of: visibleMessageID) { _, id in
-                        if !followTail { model.rememberPlace(id, for: state.storedID) }
+                        if !followTail && initialSavedPlace == nil { model.rememberPlace(id, for: state.storedID) }
                     }
                     .onDisappear {
-                        model.rememberPlace(followTail ? nil : visibleMessageID, for: state.storedID)
+                        model.rememberPlace(followTail ? nil : initialSavedPlace ?? visibleMessageID, for: state.storedID)
                     }
                     .onChange(of: state.messages.last) { _, _ in
-                        if followTail { proxy.scrollTo("tail", anchor: .bottom) }
-                    }
-                    .onChange(of: state.pendingInputs.count) { _, _ in proxy.scrollTo("tail", anchor: .bottom) }
-                    .onChange(of: state.storedID) { _, _ in
-                        focused = false
-                        if let saved = model.place(for: state.storedID).visibleMessageID {
-                            followTail = false
-                            proxy.scrollTo(saved, anchor: .top)
-                        } else {
-                            followTail = true
+                        if awaitsInitialMessages, !state.messages.isEmpty {
+                            awaitsInitialMessages = false
+                            if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                            else { proxy.scrollTo("tail", anchor: .bottom) }
+                        } else if followTail && !model.isPassiveChannel {
                             proxy.scrollTo("tail", anchor: .bottom)
                         }
                     }
+                    .onChange(of: state.messages.count) { _, _ in
+                        if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                    }
+                    .onChange(of: model.isLoadingChannelHistory) { _, loading in
+                        if !loading && initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                    }
+                    .onChange(of: state.pendingInputs.count) { _, _ in if !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
                     .task(id: model.activityRequestFocusID) {
                         guard let requestID = model.activityRequestFocusID,
                               state.pendingInputs.contains(where: { $0.id == requestID }) else { return }
@@ -138,7 +169,7 @@ struct IOSChatView: View {
                             }
                             .buttonStyle(.plain).talariaGlass(cornerRadius: 18, interactive: true)
                         }
-                        composer
+                        if !model.isPassiveChannel { composer }
                     }
                     .frame(maxWidth: 792)
                     .padding(.horizontal, 16).padding(.bottom, bottomInset)
@@ -323,7 +354,7 @@ private struct IOSMessageBubble: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     private var isUser: Bool { message.role == .user }
-    private var hasContent: Bool { !message.text.isEmpty || message.isStreaming || !message.reasoning.isEmpty }
+    private var hasContent: Bool { !message.displayText.isEmpty || message.isStreaming || !message.reasoning.isEmpty }
 
     var body: some View {
         if hasContent {
@@ -336,8 +367,8 @@ private struct IOSMessageBubble: View {
                         }
                         .iosFont(13).tint(TalariaStyle.accent)
                     }
-                    if !message.text.isEmpty || message.isStreaming {
-                        MarkdownMessage(text: message.text, isStreaming: message.isStreaming)
+                    if !message.displayText.isEmpty || message.isStreaming {
+                        MarkdownMessage(text: message.displayText, isStreaming: message.isStreaming)
                             .iosFont(16).lineSpacing(4)
                             .foregroundStyle(isUser ? .white : .primary)
                     }

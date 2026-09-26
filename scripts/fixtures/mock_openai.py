@@ -105,7 +105,7 @@ class MockOpenAI:
                         finish = "stop"
                     else:
                         if "todo_list" not in tools:
-                            raise ValueError("Hermes did not advertise the pinned todo_list tool")
+                            raise ValueError("Hermes did not advertise the pinned todo_list tool; got " + repr(sorted(str(t) for t in tools)))
                         message = {"role": "assistant", "content": None, "tool_calls": [{
                             "id": "call_native_smoke", "type": "function", "function": {
                                 "name": "todo_list", "arguments": json.dumps({"todos": [{

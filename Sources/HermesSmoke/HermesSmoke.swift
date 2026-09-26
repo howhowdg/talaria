@@ -32,6 +32,7 @@ struct HermesSmoke {
             print("""
             hermes-smoke --url URL [--profile default] [--prompt TEXT]
               Set HERMES_GATEWAY_TOKEN in the environment.
+              Or --basic with HERMES_GATEWAY_USERNAME and HERMES_GATEWAY_PASSWORD.
             hermes-smoke --launch-python PATH --launch-home PATH --launch-cwd PATH [--profile default]
               Launch and stop an owned local runtime with a generated token.
             Both modes create one session and send one prompt.
@@ -67,7 +68,8 @@ struct HermesSmoke {
                 token = running.token
                 ownedRuntimeURL = url
             } else {
-                guard let credential = ProcessInfo.processInfo.environment["HERMES_GATEWAY_TOKEN"], !credential.isEmpty else {
+                let credential = ProcessInfo.processInfo.environment[args.contains("--basic") ? "HERMES_GATEWAY_PASSWORD" : "HERMES_GATEWAY_TOKEN"] ?? ""
+                guard !credential.isEmpty else {
                     throw SmokeError.failure("Set HERMES_GATEWAY_TOKEN; credentials are never accepted as command-line arguments.")
                 }
                 guard let endpointURL = URL(string: argument("--url", default: "http://127.0.0.1:8642")) else {
@@ -76,8 +78,26 @@ struct HermesSmoke {
                 token = credential
                 url = endpointURL
             }
-            let endpoint = GatewayEndpoint(name: "Smoke test", baseURL: url, profile: profile)
-            try await client.connect(to: endpoint, token: token)
+            let basic = args.contains("--basic")
+            let endpoint = GatewayEndpoint(name: "Smoke test", baseURL: url, profile: profile,
+                                           authentication: basic ? .basic : .sessionToken)
+            var session = try basic ? GatewaySession(endpoint: endpoint) : GatewaySession(endpoint: endpoint, token: token)
+            if basic {
+                let username = ProcessInfo.processInfo.environment["HERMES_GATEWAY_USERNAME"] ?? ""
+                let rejected = try GatewaySession(endpoint: endpoint)
+                do {
+                    try await rejected.login(username: username, password: "intentionally-incorrect-fixture-password")
+                    throw SmokeError.failure("An incorrect password was accepted.")
+                } catch GatewayTransportError.invalidCredentials { }
+                try await session.login(username: username, password: token)
+                _ = try await GatewayReader(session: session).read(.schedules)
+                guard let saved = await session.snapshot() else { throw SmokeError.failure("Login omitted resumable session cookies.") }
+                let encoded = try JSONEncoder().encode(saved)
+                await session.clear()
+                session = try GatewaySession(endpoint: endpoint, restored: JSONDecoder().decode(GatewaySessionSnapshot.self, from: encoded))
+                try await session.validate()
+            }
+            try await client.connect(to: endpoint, session: session)
             let snapshot = try await client.request("session.create", params: .object([
                 "profile": .string(profile), "source": .string("native"), "title": .string("Native integration smoke")
             ]), timeout: 90)
@@ -96,11 +116,11 @@ struct HermesSmoke {
                 throw SmokeError.failure("Hermes reported a failed turn")
             }
             let list = try await client.request("session.list", params: .object(["profile": .string(profile), "limit": .number(100)]))
-            guard let session = list["sessions"]?.arrayValue?.first(where: { $0["id"]?.stringValue == state.storedID.rawValue })
+            guard let listedSession = list["sessions"]?.arrayValue?.first(where: { $0["id"]?.stringValue == state.storedID.rawValue })
                 ?? list["sessions"]?.arrayValue?.first(where: { $0["title"]?.stringValue == "Native integration smoke" }),
-                let stored = session["id"]?.stringValue else { throw SmokeError.failure("Created session missing from session.list") }
+                let stored = listedSession["id"]?.stringValue else { throw SmokeError.failure("Created session missing from session.list") }
             await client.disconnect()
-            try await client.connect(to: endpoint, token: token)
+            try await client.connect(to: endpoint, session: session)
             let resumed = try await client.request("session.resume", params: .object([
                 "session_id": .string(stored), "profile": .string(profile), "source": .string("native")
             ]), timeout: 90)
@@ -112,9 +132,18 @@ struct HermesSmoke {
             if args.contains("--extended") {
                 let fixtureDirectory = argument("--fixture-directory", default: "")
                 guard !fixtureDirectory.isEmpty else { throw SmokeError.failure("Extended checks require a fixture directory.") }
-                extended = try await runExtended(client: client, endpoint: endpoint, token: token,
+                extended = try await runExtended(client: client, endpoint: endpoint, session: session, token: token,
                     probe: probe, snapshot: resumed, state: hydrated,
                     fixtureDirectory: URL(fileURLWithPath: fixtureDirectory))
+            }
+            if basic {
+                await client.disconnect()
+                await session.logout()
+                guard await session.snapshot() == nil else { throw SmokeError.failure("Sign out retained credentials.") }
+                do {
+                    try await session.validate()
+                    throw SmokeError.failure("Signed-out session remained authenticated.")
+                } catch GatewayTransportError.notConnected { }
             }
             let counts = await probe.counts()
             await client.disconnect()
@@ -161,7 +190,7 @@ struct HermesSmoke {
         }
     }
 
-    private static func runExtended(client: GatewayClient, endpoint: GatewayEndpoint, token: String,
+    private static func runExtended(client: GatewayClient, endpoint: GatewayEndpoint, session: GatewaySession, token: String,
                                     probe: EventProbe, snapshot: JSONValue, state: ConversationState,
                                     fixtureDirectory: URL) async throws -> [String: JSONValue] {
         let settings = GatewaySettingsService(client: client)
@@ -198,8 +227,8 @@ struct HermesSmoke {
         let image = try AttachmentLoader.stage(data: Data(contentsOf: fixtureDirectory.appendingPathComponent("native-smoke.png")),
                                               filename: "native-smoke.png", scope: scope)
         let transfer = AttachmentTransferService()
-        let uploadedDocument = try await transfer.upload(document, workspace: workspace, endpoint: endpoint, token: token)
-        let uploadedImage = try await transfer.upload(image, workspace: workspace, endpoint: endpoint, token: token)
+        let uploadedDocument = try await transfer.upload(document, workspace: workspace, session: session)
+        let uploadedImage = try await transfer.upload(image, workspace: workspace, session: session)
         let imageResult = try await client.request("image.attach", params: .object([
             "session_id": .string(sessionID), "profile": .string(endpoint.profile), "path": .string(uploadedImage.hostPath)
         ]))
@@ -210,7 +239,7 @@ struct HermesSmoke {
                                                   attachments: [uploadedDocument, uploadedImage], scope: scope)
         try await submitAndWait(prompt, sessionID: sessionID, profile: endpoint.profile, client: client, probe: probe)
         await client.disconnect()
-        try await client.connect(to: endpoint, token: token)
+        try await client.connect(to: endpoint, session: session)
         let rehydrated = try await client.request("session.resume", params: .object([
             "session_id": .string(state.storedID.rawValue), "profile": .string(endpoint.profile), "source": .string("native")
         ]), timeout: 90)
@@ -229,14 +258,17 @@ struct HermesSmoke {
         }
 
         let namedProfile = "native-smoke-secondary"
-        let otherEndpoint = GatewayEndpoint(name: "Named profile fixture", baseURL: endpoint.baseURL, profile: namedProfile)
+        let otherEndpoint = GatewayEndpoint(id: endpoint.id, name: endpoint.name, baseURL: endpoint.baseURL, profile: namedProfile, authentication: endpoint.authentication)
         let other = GatewayClient()
         let otherProbe = EventProbe()
         let otherUpdates = await other.updates()
         let otherReceiver = Task { for await update in otherUpdates { await otherProbe.record(update) } }
         defer { otherReceiver.cancel() }
         do {
-            try await other.connect(to: otherEndpoint, token: token)
+            let otherSession = try endpoint.authentication == .basic
+                ? GatewaySession(endpoint: otherEndpoint, restored: await session.snapshot())
+                : GatewaySession(endpoint: otherEndpoint, token: token)
+            try await other.connect(to: otherEndpoint, session: otherSession)
             let created = try await other.request("session.create", params: .object([
                 "profile": .string(namedProfile), "source": .string("native"), "title": .string("Native named profile smoke")
             ]), timeout: 90)

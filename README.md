@@ -19,7 +19,7 @@ Talaria puts your conversations, workspaces, scheduled results and approvals in 
 - **Automations** — read scheduled results, inspect run history, and pause, resume or run existing automations.
 - **Activity** — see unread results and requests that need your decision, with a path back to their conversation.
 
-Talaria supports streaming replies, native Markdown, file and image attachments, persistent text drafts, model selection and existing Hermes profiles. Approval controls preserve the choices allowed by your host. Optional [Telegram topic import](docs/telegram-topics.md) connects selected topics to Home or Workspaces.
+Talaria supports streaming replies, native Markdown, file and image attachments, persistent text drafts, model selection and existing Hermes profiles. Approval controls preserve the choices allowed by your host. The source build includes [channel mirroring](docs/channel-thread-mirroring-proposal.md): browse recorded Telegram, Discord, Slack and other channel conversations, with live history refresh, paging and explicit continuation. Optional [Telegram topic import](docs/telegram-topics.md) connects selected topics to Home or Workspaces.
 
 ## Download
 
@@ -36,6 +36,8 @@ Talaria is an early preview. Workspace organisation is stored on each device; it
 Use one active sending client per session during this preview. See [current capabilities and limitations](docs/status.md) for compatibility and reliability details.
 
 ## Build from source
+
+Source builds support Hermes username/password sign-in on Mac and iOS. Select **Username & password**; **Remember sign-in** saves the session in device-only Keychain, not the password. On Mac, select **SSH** and paste `user@host`. Talaria uses this Mac's SSH key or agent and `~/.ssh/known_hosts`, starts a private Hermes gateway on the SSH host, and obtains its session token automatically. **Advanced → Use running gateway** instead connects to a gateway already listening on a chosen port and path; that gateway may require its own sign-in. Direct remote URLs use HTTPS or a Tailscale 100.64.0.0/10 HTTP address. The 0.1.2 download above supports session tokens only.
 
 Development uses **Xcode 27 / Swift 6.4**. The checked-in project has no external Swift package dependencies.
 

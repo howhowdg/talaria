@@ -272,14 +272,19 @@ struct HierarchyOtherConversations: View {
     @Bindable var model: HermesAppModel
     let onNavigate: @MainActor (HierarchyDestination) -> Void
     var showTitle = true
+    private var sessions: [SessionSummary] {
+        let channelIDs = model.channelSessionIDs
+        return model.otherConversations.filter { !channelIDs.contains($0.id) }
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            ChannelSections(model: model, onNavigate: onNavigate)
             if showTitle && H.mobile { Text("Other conversations").hierarchyFont(28, .bold).tracking(-0.4) }
-            HierarchySectionLabel(title: "Other conversations · \(model.otherConversations.count)")
-            if model.otherConversations.isEmpty {
+            HierarchySectionLabel(title: "Other conversations · \(sessions.count)")
+            if sessions.isEmpty {
                 Text("No other conversations.").hierarchyFont(H.body).foregroundStyle(.secondary).padding(.vertical, 16)
             }
-            ForEach(model.otherConversations) { session in
+            ForEach(sessions) { session in
                 Button { onNavigate(.conversation(session.id)) } label: {
                     HStack {
                         Text(session.displayTitle).hierarchyFont(H.mobile ? 16 : 12, .medium).lineLimit(1)

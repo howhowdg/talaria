@@ -36,6 +36,9 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+          NSExceptionDomains:
+            100.64.0.0/10:
+              NSExceptionAllowsInsecureHTTPLoads: true
     dependencies:
       - package: HermesNative
         product: HermesUI
@@ -76,6 +79,9 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+          NSExceptionDomains:
+            100.64.0.0/10:
+              NSExceptionAllowsInsecureHTTPLoads: true
     dependencies:
       - package: HermesNative
         product: HermesUI

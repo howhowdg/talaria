@@ -3,6 +3,7 @@ import Foundation
 struct GatewayHTTPResponse: Sendable {
     let data: Data
     let status: Int
+    var headers: [String: String] = [:]
 }
 
 protocol GatewayHTTPTransport: Sendable {
@@ -53,7 +54,10 @@ final class URLSessionGatewayNetwork: GatewayHTTPTransport, @unchecked Sendable 
     func data(for request: URLRequest) async throws -> GatewayHTTPResponse {
         let (data, response) = try await httpSession.data(for: request)
         guard let response = response as? HTTPURLResponse else { throw GatewayTransportError.invalidResponse }
-        return GatewayHTTPResponse(data: data, status: response.statusCode)
+        return GatewayHTTPResponse(data: data, status: response.statusCode,
+                                   headers: response.allHeaderFields.reduce(into: [:]) { fields, entry in
+                                       fields[String(describing: entry.key)] = String(describing: entry.value)
+                                   })
     }
 
     func socket(for request: URLRequest) -> any GatewaySocket {

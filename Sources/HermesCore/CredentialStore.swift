@@ -1,7 +1,8 @@
 import Foundation
 import Security
+import HermesTransport
 
-/// Only connection tokens live here. Agent/provider secrets stay on the Hermes host.
+/// Only gateway credentials live here. Agent/provider secrets stay on the Hermes host.
 public struct CredentialStore: Sendable {
     private let service: String
     public init(service: String = "com.talaria.gateway") { self.service = service }
@@ -39,5 +40,47 @@ public struct CredentialStore: Sendable {
     public struct StoreError: LocalizedError {
         public let status: OSStatus
         public var errorDescription: String? { "Keychain could not access the connection credential (\(status))." }
+    }
+}
+
+extension CredentialStore {
+    private struct BoundCredential<Value: Codable>: Codable {
+        let baseURL: URL
+        let ssh: GatewaySSHDestination?
+        let value: Value
+    }
+
+    func readSession(for endpoint: GatewayEndpoint) throws -> GatewaySessionSnapshot? {
+        try readBound(GatewaySessionSnapshot.self, account: "basic." + endpoint.id.uuidString, endpoint: endpoint)
+    }
+    func saveSession(_ snapshot: GatewaySessionSnapshot, for endpoint: GatewayEndpoint) throws {
+        try saveBound(snapshot, account: "basic." + endpoint.id.uuidString, endpoint: endpoint)
+    }
+    func deleteSession(for endpoint: GatewayEndpoint) throws {
+        try delete(account: "basic." + endpoint.id.uuidString)
+    }
+    func readToken(for endpoint: GatewayEndpoint, legacyEndpoint: GatewayEndpoint?) throws -> String? {
+        if let token = try readBound(String.self, account: "token." + endpoint.id.uuidString, endpoint: endpoint) { return token }
+        // Legacy UUID accounts have no origin binding; only their saved endpoint proves ownership.
+        guard legacyEndpoint?.id == endpoint.id, legacyEndpoint?.baseURL == endpoint.baseURL,
+              legacyEndpoint?.authentication == .sessionToken, endpoint.ssh == nil else { return nil }
+        return try read(account: endpoint.id.uuidString)
+    }
+    func saveToken(_ token: String, for endpoint: GatewayEndpoint) throws {
+        try saveBound(token, account: "token." + endpoint.id.uuidString, endpoint: endpoint)
+        try delete(account: endpoint.id.uuidString)
+    }
+    func deleteToken(for endpoint: GatewayEndpoint) throws {
+        try delete(account: "token." + endpoint.id.uuidString)
+        try delete(account: endpoint.id.uuidString)
+    }
+    private func readBound<Value: Codable>(_ type: Value.Type, account: String, endpoint: GatewayEndpoint) throws -> Value? {
+        guard let raw = try read(account: account) else { return nil }
+        let saved = try JSONDecoder().decode(BoundCredential<Value>.self, from: Data(raw.utf8))
+        return saved.baseURL == endpoint.baseURL && saved.ssh == endpoint.ssh ? saved.value : nil
+    }
+    private func saveBound<Value: Codable>(_ value: Value, account: String, endpoint: GatewayEndpoint) throws {
+        let data = try JSONEncoder().encode(BoundCredential(baseURL: endpoint.baseURL, ssh: endpoint.ssh, value: value))
+        try save(String(decoding: data, as: UTF8.self), account: account)
     }
 }

@@ -54,7 +54,10 @@ Choices persist on this device by connection and profile. Their stable identity
 is the chat/thread/routing key, so opening or refreshing can follow Hermes's
 explicit current-session pointer after a Telegram reset. Missing or unverifiable
 bindings preserve saved choices and disable sending rather than substitute an
-unrelated conversation. There is no periodic live synchronisation.
+unrelated conversation. In the source build, the visible imported conversation and its binding refresh
+while Talaria is in the foreground. Opening a channel is passive; choose
+**Continue in Talaria** to resume it. Basic channel browsing does not require
+this extension.
 
 If discovery is unavailable, check that the gateway was started with this
 launcher and that Hermes has recorded a topic for the selected profile. Ordinary

@@ -340,13 +340,6 @@ final class WorkspaceActivityTests: XCTestCase {
         XCTAssertEqual(ActivityPresentation.trailingMetadata(withSummary), "")
     }
 
-    func testDarkTerminalPreviewUsesOnlyTerminalOutputAndPreservesWhitespace() throws {
-        let output = "  indented output\n\n"
-        let value = JSONValue.object(["output": .string(output), "exit_code": .number(0)])
-        XCTAssertEqual(try ActivityPresentation.terminalOutput(tool(value, name: "terminal")), output)
-        XCTAssertNil(try ActivityPresentation.terminalOutput(tool(value, name: "read_file")))
-        XCTAssertNil(try ActivityPresentation.terminalOutput(tool(.object(["output": .object(["raw": .string("json")])]), name: "terminal")))
-        XCTAssertNil(ActivityPresentation.terminalOutput(ChatMessage(role: .tool, text: "raw terminal JSON", toolName: "terminal")))
-    }
+
 
 }

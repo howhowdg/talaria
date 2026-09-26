@@ -22,7 +22,7 @@ struct HermesIOSApp: App {
                     returnedFromBackground = true
                 }
                 // Resume with authoritative history after suspension; never resend a prompt.
-                if phase == .active, returnedFromBackground, model.endpoint != nil, !model.isConnecting {
+                if phase == .active, returnedFromBackground, model.desiredConnection, !model.isConnecting {
                     returnedFromBackground = false
                     Task { await model.reconnect() }
                 }

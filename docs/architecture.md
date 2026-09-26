@@ -45,11 +45,13 @@ and transcript places are connection/profile scoped and do not sync across devic
   reading provider credentials. It launches a loopback Hermes child with an
   ephemeral token, reads readiness, keeps bounded redacted logs and stops only
   its own child. Existing gateways and unrelated Hermes processes remain owned
-  by their original launcher. Hermes/Python installation and SSH management are
-  separate from the app; iOS has no local runtime supervisor.
-- Gateway tokens may be saved in device-only Keychain entries. Provider and agent
+  by their original launcher. On Mac, SSH starts a separate loopback-only Hermes
+  gateway with an ephemeral token by default; Advanced can forward an existing
+  gateway instead. Talaria stops only its own remote process and SSH child.
+  iOS has no local runtime supervisor or SSH transport.
+- Gateway tokens and Basic sign-in sessions may be saved in device-only Keychain entries. `GatewaySession` owns scoped session cookies, refresh probes and one-use WebSocket tickets; readers, uploads and socket setup share it. Passwords are never persisted. Provider and agent
   credentials remain on the host. Persistable endpoint URLs reject embedded
-  credentials, queries and fragments; remote transport requires HTTPS. See
+  credentials, queries and fragments; remote direct transport requires HTTPS except for Tailscale 100.64.0.0/10 IP addresses. SSH credentials bind to the saved destination, not the temporary local port. See
   [security reporting](../SECURITY.md).
 - Profile routing remains explicit. Selecting a profile does not globally
   activate it on the host. Capability negotiation and legacy fallbacks do not

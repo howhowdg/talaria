@@ -7,6 +7,10 @@ import UniformTypeIdentifiers
 public struct HermesRootView: View {
     @Bindable private var model: HermesAppModel
     private let startLocal: (@MainActor () async -> Void)?
+    private let connectSSH: (@MainActor (GatewayEndpoint, String?, String?, String?, Bool) async -> GatewayAuthentication?)?
+    private let reconnectSSH: (@MainActor () async -> Void)?
+    private let endSSH: (@MainActor (Bool) async -> Void)?
+    @Environment(\.scenePhase) private var scenePhase
     @State private var startingLocal = false
     @State private var selection: StoredSessionID?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -15,8 +19,12 @@ public struct HermesRootView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
-    public init(model: HermesAppModel, startLocal: (@MainActor () async -> Void)? = nil) {
+    public init(model: HermesAppModel, startLocal: (@MainActor () async -> Void)? = nil,
+                connectSSH: (@MainActor (GatewayEndpoint, String?, String?, String?, Bool) async -> GatewayAuthentication?)? = nil,
+                reconnectSSH: (@MainActor () async -> Void)? = nil,
+                endSSH: (@MainActor (Bool) async -> Void)? = nil) {
         self.model = model; self.startLocal = startLocal
+        self.connectSSH = connectSSH; self.reconnectSSH = reconnectSSH; self.endSSH = endSSH
     }
 
     public var body: some View {
@@ -40,8 +48,11 @@ public struct HermesRootView: View {
             #endif
         }
         .tint(TalariaStyle.accent)
+        .onChange(of: scenePhase, initial: true) { _, phase in model.setChannelForeground(phase == .active) }
         .onOpenURL { url in Task { _ = await model.openHierarchyLink(url) } }
-        .sheet(isPresented: $model.showConnection) { ConnectionView(model: model) }
+        .sheet(isPresented: $model.showConnection) {
+            ConnectionView(model: model, connectSSH: connectSSH, endSSH: endSSH)
+        }
         .sheet(isPresented: $model.showSessionSettings) {
             SessionSettingsView(state: SessionSettingsViewState(snapshot: model.settingsSnapshot,
                 profile: model.endpoint?.profile ?? "default", sessionID: settingsConversation?.runtimeID.rawValue,
@@ -69,10 +80,15 @@ public struct HermesRootView: View {
         #endif
     }
 
+    private func reconnect() async {
+        if model.endpoint?.ssh != nil, let reconnectSSH { await reconnectSSH() }
+        else { await model.reconnect() }
+    }
+
     /// List and Run destinations retain a selected conversation for drafts, but
     /// it is not a valid implicit target for an unrelated Settings sheet.
     private var settingsConversation: ConversationState? {
-        guard let state = model.conversation, state.owner == model.currentHierarchyOwner else { return nil }
+        guard !model.isPassiveChannel, let state = model.conversation, state.owner == model.currentHierarchyOwner else { return nil }
         switch model.hierarchyDestination {
         case .home: return state.storedID == model.homeSessionID && model.homeAvailability == .available ? state : nil
         case .workspace(let id): return model.workspace(id: id)?.sessionIDs.contains(state.storedID) == true ? state : nil
@@ -281,7 +297,7 @@ public struct HermesRootView: View {
             Circle().fill(T.failed).frame(width: 7, height: 7)
             Text(message).font(T.f(11.5)).lineLimit(3).textSelection(.enabled)
             if !model.isConnected, model.endpoint != nil {
-                Button("Retry now") { Task { await model.reconnect() } }
+                Button("Retry now") { Task { await reconnect() } }
                     .font(T.f(11.5, .semibold)).buttonStyle(.plain).foregroundStyle(T.deep).disabled(model.isConnecting)
             } else {
                 Button { model.banner = nil } label: { Image(systemName: "xmark").font(T.f(10)) }
@@ -299,7 +315,7 @@ public struct HermesRootView: View {
                 }.buttonStyle(.plain).accessibilityLabel("Dismiss notice")
             }
             if model.endpoint != nil {
-                Button("Reconnect") { Task { await model.reconnect() } }
+                Button("Reconnect") { Task { await reconnect() } }
                     .frame(minHeight: 44).talariaSecondaryButton().disabled(model.isConnecting)
             }
         }
@@ -389,6 +405,8 @@ private struct ConversationView: View {
     @Bindable var model: HermesAppModel
     let state: ConversationState
     @State private var followTail = true
+    @State private var awaitsInitialMessages = false
+    @State private var initialSavedPlace: String?
     @State private var showImporter = false
     @State private var importScope: ComposerScope?
     @State private var visibleMessageID: String?
@@ -427,7 +445,7 @@ private struct ConversationView: View {
                     }
                     .font(TalariaTypography.callout).frame(minHeight: 44).contentShape(Rectangle())
                 }
-                .buttonStyle(.plain).disabled(!model.isConnected).help("Model and profile settings")
+                .buttonStyle(.plain).disabled(!model.isConnected || model.isPassiveChannel).help("Model and profile settings")
                 .accessibilityLabel("Model: \(state.model.isEmpty ? "Not selected" : state.model)")
                 .accessibilityHint("Opens model and profile settings")
             }
@@ -436,7 +454,8 @@ private struct ConversationView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 22) {
-                        if state.messages.isEmpty {
+                        ChannelHistoryControls(model: model)
+                        if state.messages.isEmpty && !model.isPassiveChannel {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("What are we working on?").font(TalariaTypography.title2.weight(.medium))
                                 Text("Ask a question, share a file, or start with an idea.")
@@ -475,26 +494,40 @@ private struct ConversationView: View {
                 .scrollDismissesKeyboard(.interactively)
                 .scrollPosition(id: $visibleMessageID, anchor: .top)
                 .onChange(of: visibleMessageID) { _, value in
-                    model.rememberPlace(value, for: state.storedID)
+                    if initialSavedPlace == nil { model.rememberPlace(value, for: state.storedID) }
                 }
-                .onChange(of: state.messages.last) { _, _ in if followTail { proxy.scrollTo("tail", anchor: .bottom) } }
-                .onChange(of: state.pendingInputs.count) { _, _ in if followTail { proxy.scrollTo("tail", anchor: .bottom) } }
-                .onChange(of: state.storedID) { _, _ in proxy.scrollTo("tail", anchor: .bottom) }
-                .onAppear {
-                    if let saved = model.place(for: state.storedID).visibleMessageID {
-                        followTail = false
-                        #if os(macOS)
-                        // Older reading places may point to a tool that now
-                        // lives inside its issuing assistant's turn.
-                        let anchor = macTranscriptGroups.first {
-                            $0.id == saved || $0.tools.contains { $0.id == saved }
-                        }?.id ?? saved
-                        #else
-                        let anchor = saved
-                        #endif
-                        visibleMessageID = anchor
-                        proxy.scrollTo(anchor, anchor: .top)
-                    } else { proxy.scrollTo("tail", anchor: .bottom) }
+                .onChange(of: state.messages.last) { _, message in
+                    if awaitsInitialMessages, message != nil {
+                        awaitsInitialMessages = false
+                        if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                        else { proxy.scrollTo("tail", anchor: .bottom) }
+                    } else if followTail && !model.isPassiveChannel {
+                        proxy.scrollTo("tail", anchor: .bottom)
+                    }
+                }
+                .onChange(of: state.messages.count) { _, _ in
+                    if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                }
+                .onChange(of: model.isLoadingChannelHistory) { _, loading in
+                    if !loading && initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                }
+                .onChange(of: state.pendingInputs.count) { _, _ in if followTail && !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
+                .task(id: state.storedID) {
+                    initialSavedPlace = model.place(for: state.storedID).visibleMessageID
+                    followTail = initialSavedPlace == nil && !model.isPassiveChannel
+                    visibleMessageID = nil
+                    awaitsInitialMessages = state.messages.isEmpty
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    guard !state.pendingInputs.contains(where: { $0.id == model.activityRequestFocusID }) else {
+                        awaitsInitialMessages = false
+                        initialSavedPlace = nil
+                        return
+                    }
+                    if !awaitsInitialMessages {
+                        if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                        else { proxy.scrollTo("tail", anchor: .bottom) }
+                    }
                 }
                 .task(id: model.activityRequestFocusID) {
                     guard let requestID = model.activityRequestFocusID,
@@ -518,6 +551,7 @@ private struct ConversationView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !model.isPassiveChannel {
             composer
                 #if os(macOS)
                 .frame(maxWidth: T.composerMaxW).padding(.horizontal, T.chatInset).padding(.top, 14).padding(.bottom, 18)
@@ -525,6 +559,7 @@ private struct ConversationView: View {
                 .frame(maxWidth: 760).padding(.horizontal, contentInset).padding(.top, 8).padding(.bottom, 12)
                 #endif
                 .frame(maxWidth: .infinity)
+            }
         }
         .onChange(of: state.storedID) { _, _ in composerFocused = true }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
@@ -568,6 +603,28 @@ private struct ConversationView: View {
             RequestReceiptView(receipt: receipt)
                 .id("request-receipt-\(receipt.id)")
         }
+    }
+
+    private func restoreSavedPlace(using proxy: ScrollViewProxy) {
+        guard let saved = initialSavedPlace else { return }
+        guard let anchor = savedAnchor(saved) else {
+            guard !state.messages.isEmpty, !model.isLoadingChannelHistory else { return }
+            if model.isViewingChannel && model.channelHistoryHasMore {
+                if model.channelHistoryError == nil { Task { await model.loadOlderChannelMessages() } }
+            } else { initialSavedPlace = nil }
+            return
+        }
+        visibleMessageID = anchor
+        proxy.scrollTo(anchor, anchor: .top)
+        initialSavedPlace = nil
+    }
+
+    private func savedAnchor(_ id: String) -> String? {
+        #if os(macOS)
+        return macTranscriptGroups.first { $0.id == id || $0.tools.contains { $0.id == id } }?.id
+        #else
+        return transcriptGroups.first { $0.messages.contains { $0.id == id } }?.id
+        #endif
     }
 
     #if os(macOS)
@@ -807,8 +864,8 @@ private struct MessageView: View {
                 }
                 .font(TalariaTypography.callout).foregroundStyle(.secondary)
             }
-            if !message.text.isEmpty || message.isStreaming {
-                MarkdownMessage(text: message.text, isStreaming: message.isStreaming)
+            if !message.displayText.isEmpty || message.isStreaming {
+                MarkdownMessage(text: message.displayText, isStreaming: message.isStreaming)
                     .font(.body).lineSpacing(5).textSelection(.enabled)
                     .foregroundStyle(message.isError ? Color.red : .primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -821,122 +878,269 @@ private struct MessageView: View {
 
 private struct ConnectionView: View {
     @Bindable var model: HermesAppModel
+    let connectSSH: (@MainActor (GatewayEndpoint, String?, String?, String?, Bool) async -> GatewayAuthentication?)?
+    let endSSH: (@MainActor (Bool) async -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var name = "My Hermes"
     @State private var address = "http://127.0.0.1:8642"
+    @State private var useSSH = false
+    @State private var sshAddress = ""
+    @State private var gatewayPort = "9119"
+    @State private var gatewayPath = "/"
+    @State private var identityFile = ""
+    @State private var showSSHOptions = false
+    @State private var useExistingGateway = false
+    @State private var sshPrompt: GatewayAuthentication?
     @State private var profile = "default"
+    @State private var authentication = GatewayAuthentication.basic
+    @State private var username = ""
+    @State private var password = ""
     @State private var token = ""
     @State private var remember = true
     @State private var validation: String?
+    @State private var connectionTask: Task<Void, Never>?
+    @State private var sshStarting = false
+
+    private var connectLabel: String {
+        if sshStarting { return model.isConnecting ? "Signing in…" : "Connecting SSH…" }
+        if useSSH { return sshPrompt == .basic ? "Sign in" : "Connect" }
+        return model.isConnecting ? "Connecting gateway…" : authentication == .basic ? "Sign in" : "Connect"
+    }
+
+    private var authenticationPicker: some View {
+        Picker("Authentication", selection: $authentication) {
+            Text("Username & password").tag(GatewayAuthentication.basic)
+            Text("Session token").tag(GatewayAuthentication.sessionToken)
+        }
+    }
 
     var body: some View {
         Group {
             #if os(macOS)
             macConnection
             #else
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Name", text: $name)
-                    TextField("Gateway URL", text: $address).autocorrectionDisabled()
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never).keyboardType(.URL)
-                        #endif
-                    TextField("Profile", text: $profile).autocorrectionDisabled()
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        #endif
-                } header: {
-                    Text("Connection")
-                } footer: {
-                    Text("Connect to a token-authenticated Hermes gateway. Remote connections require HTTPS.")
+            NavigationStack {
+                Form {
+                    Section("Connection") {
+                        TextField("Name", text: $name)
+                        TextField("Gateway URL", text: $address)
+                            .autocorrectionDisabled().textInputAutocapitalization(.never).keyboardType(.URL)
+                        TextField("Profile", text: $profile)
+                            .autocorrectionDisabled().textInputAutocapitalization(.never)
+                    }.disabled(model.isConnecting || sshStarting)
+                    Section("Authentication") {
+                        authenticationPicker
+                        if authentication == .basic {
+                            TextField("Username", text: $username).textContentType(.username)
+                                .autocorrectionDisabled().textInputAutocapitalization(.never)
+                            SecureField("Password", text: $password).textContentType(.password)
+                        } else {
+                            SecureField("Session token", text: $token)
+                        }
+                        Toggle("Remember sign-in", isOn: $remember)
+                    }.disabled(model.isConnecting || sshStarting)
+                    if let text = validation ?? model.banner {
+                        Section { Text(text).font(TalariaTypography.callout).foregroundStyle(.red).textSelection(.enabled) }
+                    }
+                    if model.endpoint != nil && !model.isConnecting && !sshStarting {
+                        Section {
+                            if model.isConnected {
+                                Button("Disconnect", role: .destructive) {
+                                    Task { await endConnection(signOut: false); dismiss() }
+                                }
+                            }
+                            if model.endpoint?.authentication == .basic {
+                                Button("Sign out", role: .destructive) {
+                                    Task { await endConnection(signOut: true); dismiss() }
+                                }
+                            }
+                        }
+                    }
                 }
-                Section {
-                    SecureField("Session token", text: $token)
-                    Toggle("Remember connection in Keychain", isOn: $remember)
-                } header: {
-                    Text("Authentication")
-                } footer: {
-                    Text("An empty token field reuses this connection’s current or saved token. OAuth gateways are not supported in this preview.")
-                }
-                if let text = validation ?? model.banner {
-                    Section { Text(text).font(TalariaTypography.callout).foregroundStyle(.red).textSelection(.enabled) }
-                }
-                if model.isConnected {
-                    Section {
-                        Button("Disconnect", role: .destructive) {
-                            Task { await model.disconnect(); dismiss() }
-                        }.frame(minHeight: 44)
+                .formStyle(.grouped)
+                .navigationTitle("Connect to Hermes")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel", action: cancel).keyboardShortcut(.cancelAction)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(connectLabel, action: connect)
+                            .disabled(model.isConnecting || sshStarting).keyboardShortcut(.defaultAction)
                     }
                 }
             }
-            .formStyle(.grouped)
-            .disabled(model.isConnecting)
-            .navigationTitle("Connect to Hermes")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(model.isConnecting ? "Connecting…" : "Connect", action: connect)
-                        .disabled(model.isConnecting).keyboardShortcut(.defaultAction)
-                }
-            }
-        }
             #endif
         }
         .tint(TalariaStyle.accent)
         .frame(idealWidth: 480, idealHeight: 560)
+        .interactiveDismissDisabled(model.isConnecting || sshStarting)
         .onAppear {
             if let endpoint = model.endpoint ?? model.savedEndpoint {
                 name = endpoint.name; address = endpoint.baseURL.absoluteString; profile = endpoint.profile
+                authentication = endpoint.authentication
+                remember = model.remembersSignIn
+                if let ssh = endpoint.ssh {
+                    useSSH = true
+                    sshAddress = (ssh.user.map { "\($0)@" } ?? "") + ssh.host
+                        + (ssh.sshPort == 22 ? "" : ":\(ssh.sshPort)")
+                    gatewayPort = String(ssh.gatewayPort)
+                    gatewayPath = ssh.gatewayPath.isEmpty ? "/" : ssh.gatewayPath
+                    identityFile = ssh.identityFile ?? ""
+                    useExistingGateway = ssh.attachesExistingGateway
+                    showSSHOptions = useExistingGateway || ssh.identityFile != nil
+                }
             }
         }
-        .onDisappear { token = "" }
+        .onChange(of: useSSH) { _, _ in
+            sshPrompt = nil; password = ""; token = ""; validation = nil
+        }
+        .onChange(of: authentication) { _, _ in password = ""; token = ""; validation = nil }
+        .onDisappear {
+            password = ""; token = ""
+            // Successful dismissal happens before session/history hydration finishes.
+            if !model.isConnected && (model.isConnecting || sshStarting) { connectionTask?.cancel() }
+        }
     }
 
     #if os(macOS)
     private var macConnection: some View {
         SettingsSheet("Connect to Hermes", content: {
-            SettingsSection("Connection", footer: "Connect to your Hermes gateway. Remote connections require HTTPS.") {
-                SettingsRow("Name") { ValueField(text: $name, mono: false) }
-                SettingsRow("Gateway URL") { ValueField(text: $address) }
-                SettingsRow("Profile") { ValueField(text: $profile) }
-            }
-            SettingsSection("Authentication", footer: "Leave the token blank to reuse this connection’s current or saved token.") {
-                SettingsRow("Session token") {
-                    SecureField("Token", text: $token).textFieldStyle(.plain).font(T.f(12.5))
-                        .padding(.horizontal, 9).frame(height: 26).background(T.field, in: RoundedRectangle(cornerRadius: 6))
+            SettingsSection("Connection") {
+                SettingsRow("Name") { ValueField(text: $name, mono: false).accessibilityLabel("Name") }
+                SettingsRow("Transport") {
+                    Picker("Transport", selection: $useSSH) {
+                        Text("Direct").tag(false)
+                        Text("SSH").tag(true)
+                    }.labelsHidden()
                 }
-                SettingsRow("Remember in Keychain") {
-                    Toggle("Remember in Keychain", isOn: $remember).labelsHidden().toggleStyle(.switch).controlSize(.mini)
+                if useSSH {
+                    SettingsRow("SSH host") { ValueField(text: $sshAddress).accessibilityLabel("SSH host") }
+                    DisclosureGroup("Advanced", isExpanded: $showSSHOptions) {
+                        SettingsRow("Use running gateway") {
+                            Toggle("Use running gateway", isOn: $useExistingGateway).labelsHidden().toggleStyle(.switch).controlSize(.mini)
+                        }
+                        if useExistingGateway {
+                            SettingsRow("Gateway port") { ValueField(text: $gatewayPort).accessibilityLabel("Gateway port") }
+                            SettingsRow("Gateway path") { ValueField(text: $gatewayPath).accessibilityLabel("Gateway path") }
+                        }
+                        SettingsRow("Identity file") { ValueField(text: $identityFile).accessibilityLabel("Identity file") }
+                    }
+                } else {
+                    SettingsRow("Gateway URL") { ValueField(text: $address).accessibilityLabel("Gateway URL") }
                 }
-            }
+                SettingsRow("Profile") { ValueField(text: $profile).accessibilityLabel("Profile") }
+            }.disabled(model.isConnecting || sshStarting)
+            SettingsSection("Authentication") {
+                if !useSSH { SettingsRow("Method") { authenticationPicker } }
+                if (useSSH ? sshPrompt : authentication) == .basic {
+                    SettingsRow("Username") { ValueField(text: $username, mono: false).textContentType(.username).accessibilityLabel("Username") }
+                    SettingsRow("Password") { secretField("Password", text: $password).textContentType(.password) }
+                } else if !useSSH || sshPrompt == .sessionToken {
+                    SettingsRow("Session token") { secretField("Token", text: $token) }
+                }
+                SettingsRow("Remember sign-in") {
+                    Toggle("Remember sign-in", isOn: $remember).labelsHidden().toggleStyle(.switch).controlSize(.mini)
+                }
+            }.disabled(model.isConnecting || sshStarting)
             if let text = validation ?? model.banner {
                 Text(text).font(T.f(11.5)).foregroundStyle(T.failed).textSelection(.enabled)
             }
         }, footer: {
-            if model.isConnected {
-                Button("Disconnect", role: .destructive) { Task { await model.disconnect(); dismiss() } }
-                    .buttonStyle(.plain).foregroundStyle(T.failed)
+            if !model.isConnecting && !sshStarting {
+                if model.isConnected {
+                    Button("Disconnect", role: .destructive) { Task { await endConnection(signOut: false); dismiss() } }
+                        .buttonStyle(.plain).foregroundStyle(T.failed)
+                }
+                if model.endpoint?.authentication == .basic {
+                    Button("Sign out", role: .destructive) { Task { await endConnection(signOut: true); dismiss() } }
+                        .buttonStyle(.plain).foregroundStyle(T.failed)
+                }
             }
             Spacer()
-            Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-            Button(model.isConnecting ? "Connecting…" : "Connect", action: connect)
+            Button("Cancel", action: cancel).keyboardShortcut(.cancelAction)
+            Button(connectLabel, action: connect)
+                .disabled(model.isConnecting || sshStarting)
                 .buttonStyle(.borderedProminent).tint(T.fill).keyboardShortcut(.defaultAction)
-        }).disabled(model.isConnecting).frame(height: 400)
+        }).frame(height: 470)
+    }
+
+    private func secretField(_ title: String, text: Binding<String>) -> some View {
+        SecureField(title, text: text).textFieldStyle(.plain).font(T.f(12.5))
+            .padding(.horizontal, 9).frame(height: 26).background(T.field, in: RoundedRectangle(cornerRadius: 6))
     }
     #endif
 
+    private func cancel() {
+        connectionTask?.cancel()
+        password = ""; token = ""
+        if model.isConnecting || sshStarting { Task { await endConnection(signOut: false); dismiss() } }
+        else { dismiss() }
+    }
+
+    private func endConnection(signOut: Bool) async {
+        if model.endpoint?.ssh != nil || useSSH && sshStarting, let endSSH { await endSSH(signOut) }
+        else if signOut { await model.signOut() }
+        else { await model.disconnect() }
+    }
+
     private func connect() {
         validation = nil
-        guard let url = URL(string: address.trimmingCharacters(in: .whitespacesAndNewlines)), url.host != nil else {
-            validation = "Enter a full gateway URL, including http:// or https://."; return
+        var ssh: GatewaySSHDestination?
+        let url: URL
+        if useSSH {
+            guard connectSSH != nil else { validation = "SSH is unavailable in this app."; return }
+            guard var parsed = GatewaySSHDestination.parse(sshAddress),
+                  !useExistingGateway || (Int(gatewayPort).map { (1...65535).contains($0) } == true && gatewayPath.hasPrefix("/")) else {
+                validation = "Check the SSH host, gateway port and path."; return
+            }
+            let remotePort = useExistingGateway ? Int(gatewayPort)! : 9119
+            parsed.gatewayPort = remotePort
+            parsed.gatewayPath = useExistingGateway ? gatewayPath : "/"
+            parsed.identityFile = identityFile.isEmpty ? nil : identityFile
+            parsed.useExistingGateway = useExistingGateway
+            ssh = parsed
+            guard let configuredURL = URL(string: "http://127.0.0.1:\(remotePort)\(parsed.gatewayPath)") else {
+                validation = "Check the gateway path."; return
+            }
+            url = configuredURL
+        } else {
+            guard let directURL = URL(string: address.trimmingCharacters(in: .whitespacesAndNewlines)), directURL.host != nil else {
+                validation = "Enter a full gateway URL, including http:// or https://."; return
+            }
+            url = directURL
+        }
+        guard (useSSH ? sshPrompt : authentication) != .basic || password.isEmpty || !username.isEmpty else {
+            validation = "Enter a username."; return
         }
         let previous = model.endpoint ?? model.savedEndpoint
-        let same = previous?.baseURL == url
+        var priorSSH = previous?.ssh
+        if var old = priorSSH {
+            if old.gatewayPath.isEmpty { old.gatewayPath = "/" }
+            if old.useExistingGateway == nil { old.useExistingGateway = old.attachesExistingGateway }
+            priorSSH = old
+        }
+        let same = ssh == nil ? previous?.baseURL == url && previous?.ssh == nil : priorSSH == ssh
         let endpoint = GatewayEndpoint(id: same ? previous!.id : UUID(), name: name.isEmpty ? "Hermes" : name,
-            baseURL: url, profile: profile.isEmpty ? "default" : profile)
-        Task { await model.connect(to: endpoint, token: token, remember: remember); token = "" }
+            baseURL: url, profile: profile.isEmpty ? "default" : profile,
+            authentication: useSSH ? .sessionToken : authentication, ssh: ssh)
+        let submittedPassword = password; let submittedToken = token
+        password = ""; token = ""
+        sshStarting = ssh != nil
+        connectionTask = Task {
+            if ssh != nil, let connectSSH {
+                sshPrompt = await connectSSH(endpoint, sshPrompt == .basic ? username : nil,
+                    sshPrompt == .basic ? submittedPassword : nil,
+                    sshPrompt == .sessionToken ? submittedToken : nil, remember)
+                sshStarting = false
+            } else {
+                if model.endpoint?.ssh != nil, let endSSH { await endSSH(false) }
+                guard !Task.isCancelled else { return }
+                if authentication == .basic {
+                    await model.connect(to: endpoint, username: username, password: submittedPassword, remember: remember)
+                } else {
+                    await model.connect(to: endpoint, token: submittedToken, remember: remember)
+                }
+            }
+        }
     }
 }

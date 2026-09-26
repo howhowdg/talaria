@@ -39,6 +39,20 @@ final class GatewayReaderTests: XCTestCase, @unchecked Sendable {
         XCTAssertThrowsError(try GatewayRoutes(endpoint: GatewayEndpoint(name: "Bad", baseURL: URL(string: "http://remote.test")!)))
     }
 
+    func testChannelHistoryRouteAcceptsDecodedIdentifierAndRejectsControls() throws {
+        let row = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"id":"20260922_111647_8cffaf67"}"#.utf8))
+        let id = try XCTUnwrap(row["id"]?.stringValue)
+        XCTAssertEqual(id.utf8.count, 24)
+        let routes = try GatewayRoutes(endpoint: endpoint)
+        let request = try routes.readRequest(.channelMessages(id: id, limit: 100, offset: 0), token: "fixture")
+        XCTAssertEqual(request.url?.path, "/hermes/api/sessions/\(id)/messages")
+        for control in ["\u{0}", "\n", "\u{7f}", "\u{85}", "\u{200b}"] {
+            XCTAssertThrowsError(try routes.readRequest(.channelMessages(id: id + control, limit: 100, offset: 0), token: "fixture")) {
+                XCTAssertEqual($0 as? GatewayTransportError, .invalidResponse)
+            }
+        }
+    }
+
     func testReadHandlesAuthenticationAndMalformedPayloadWithoutLeakingBody() async throws {
         let rejected = GatewayReader(endpoint: endpoint, token: "fixture", http: ReaderHTTP("secret server detail", status: 401))
         do { _ = try await rejected.read(.schedules); XCTFail("Expected authentication failure") }
@@ -53,6 +67,57 @@ final class GatewayReaderTests: XCTestCase, @unchecked Sendable {
 }
 
 extension GatewayReaderTests {
+    func testChannelRoutesKeepProfileFiltersAndPaging() throws {
+        let routes = try GatewayRoutes(endpoint: endpoint)
+        let cases: [(GatewayReadEndpoint, String, [String: String])] = [
+            (.messagingPlatforms, "/hermes/api/messaging/platforms", [:]),
+            (.channelSession(id: "thread/a?x=1"), "/hermes/api/sessions/thread%2Fa%3Fx%3D1", [:]),
+            (.channelSessions(source: nil, limit: 900, offset: -1), "/hermes/api/sessions",
+             ["limit": "100", "offset": "0", "order": "recent", "archived": "exclude",
+              "exclude_sources": "cli,codex,desktop,gateway,kanban,local,native,oneshot,tui,cron,subagent,tool,unknown,bot_room"]),
+            (.channelSessions(source: "telegram&profile=other", limit: 20, offset: 40), "/hermes/api/sessions",
+             ["source": "telegram&profile=other", "limit": "20", "offset": "40", "order": "recent", "archived": "exclude"]),
+            (.channelMessages(id: "thread/a?x=1", limit: 900, offset: 500), "/hermes/api/sessions/thread%2Fa%3Fx%3D1/messages",
+             ["limit": "500", "offset": "500", "order": "latest", "include_compacted": "true"]),
+            (.channelSearch(query: "hello & profile=other"), "/hermes/api/sessions/search",
+             ["q": "hello & profile=other", "limit": "100",
+              "exclude_sources": "cli,codex,desktop,gateway,kanban,local,native,oneshot,tui,cron,subagent,tool,unknown,bot_room"])
+        ]
+        for (resource, path, expected) in cases {
+            let request = try routes.readRequest(resource, token: "secret")
+            let route = try XCTUnwrap(URLComponents(url: XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+            XCTAssertEqual(route.host, "example.test")
+            XCTAssertEqual(route.percentEncodedPath, path)
+            var query = expected
+            query["profile"] = endpoint.profile
+            XCTAssertEqual(Dictionary(uniqueKeysWithValues: (route.queryItems ?? []).map { ($0.name, $0.value ?? "") }), query)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-Hermes-Session-Token"), "secret")
+            XCTAssertFalse(request.url!.absoluteString.contains("secret"))
+        }
+    }
+
+    func testRenameCarriesProfileInBodyAndDoesNotRetry() async throws {
+        let http = ReaderHTTP("{\"ok\":true,\"title\":\"New title\"}")
+        let reader = GatewayReader(endpoint: endpoint, token: "secret", http: http)
+        _ = try await reader.renameSession(id: "thread/a?x=1", title: "New title")
+        let requests = await http.requests
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(request.url?.absoluteString, "https://example.test/hermes/api/sessions/thread%2Fa%3Fx%3D1")
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-Hermes-Session-Token"), "secret")
+        XCTAssertEqual(try JSONDecoder().decode([String: String].self, from: XCTUnwrap(request.httpBody)),
+                       ["title": "New title", "profile": endpoint.profile])
+        let rejected = ReaderHTTP("private detail", status: 403)
+        do {
+            _ = try await GatewayReader(endpoint: endpoint, token: "secret", http: rejected).renameSession(id: "id", title: "Title")
+            XCTFail("Expected authentication failure")
+        } catch { XCTAssertEqual(error as? GatewayTransportError, .authenticationRejected) }
+        let attempts = await rejected.requests
+        XCTAssertEqual(attempts.count, 1)
+    }
+
     func testAutomationMutationsPreserveOriginProfileAndDoNotRetry() async throws {
         let http = ReaderHTTP("{}")
         let reader = GatewayReader(endpoint: endpoint, token: "secret", http: http)
