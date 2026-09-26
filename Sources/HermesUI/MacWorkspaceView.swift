@@ -117,11 +117,12 @@ struct MacWorkspaceView<Content: View>: View {
                         Text(model.isLoadingMobileActivity ? "Loading…" : "No automations").font(T.f(11))
                             .foregroundStyle(T.ink3).padding(.horizontal, 10).padding(.vertical, 6)
                     }
-                    section("Other conversations", destination: .otherConversations, count: model.otherConversations.count)
+                    ChannelSections(model: model, onNavigate: navigate).padding(.horizontal, 10)
+                    section("Other conversations", destination: .otherConversations, count: filteredConversations.count)
                     ForEach(filteredConversations.prefix(model.searchText.isEmpty ? 3 : 100)) { session in
                         navRow(session.displayTitle, destination: .conversation(session.id))
                     }
-                    if model.otherConversations.count > 3 && model.searchText.isEmpty {
+                    if filteredConversations.count > 3 && model.searchText.isEmpty {
                         Button("Show all") { navigate(.otherConversations) }.buttonStyle(.plain)
                             .font(T.f(11)).foregroundStyle(T.deep).padding(.horizontal, 10).padding(.vertical, 6)
                     }
@@ -148,7 +149,7 @@ struct MacWorkspaceView<Content: View>: View {
         model.automations.filter { model.searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(model.searchText) }
     }
     private var filteredConversations: [SessionSummary] {
-        model.otherConversations.filter { model.searchText.isEmpty || $0.displayTitle.localizedCaseInsensitiveContains(model.searchText) || $0.preview.localizedCaseInsensitiveContains(model.searchText) }
+        model.otherConversations.filter { !model.isChannelSession($0.id) && (model.searchText.isEmpty || $0.displayTitle.localizedCaseInsensitiveContains(model.searchText) || $0.preview.localizedCaseInsensitiveContains(model.searchText)) }
     }
     private func section(_ title: String, destination: HierarchyDestination, count: Int? = nil) -> some View {
         HStack {
@@ -222,7 +223,7 @@ struct MacWorkspaceView<Content: View>: View {
             }.buttonStyle(.plain).accessibilityLabel("\(model.endpoint?.name ?? "Hermes"), \(model.isConnected ? "Connected" : "Disconnected")")
             HStack(spacing: 16) {
                 Button { showsSkills = true } label: { Label("Skills", systemImage: "sparkles") }
-                Button { model.showSessionSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+                Button { model.showSessionSettings = true } label: { Label("Settings", systemImage: "gearshape") }.disabled(model.isPassiveChannel)
             }.font(T.f(11)).foregroundStyle(T.ink2).buttonStyle(.plain).disabled(!model.isConnected)
         }.padding(.horizontal, 18).padding(.vertical, 12)
     }

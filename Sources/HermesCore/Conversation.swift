@@ -27,6 +27,10 @@ public struct SessionSummary: Identifiable, Equatable, Sendable {
     /// The stored conversation's start time, not its latest activity. The pinned
     /// session.list contract exposes started_at as Unix seconds and uses 0 when absent.
     public var startedAt: Date?
+    public var activityAt: Date?
+    public var channelLabel: String { ChannelSource.label(source) }
+    public var channelSymbol: String { ChannelSource.symbol(source) }
+    public var isChannel: Bool { ChannelSource.isChannel(source) }
     public init(json: JSONValue) {
         id = StoredSessionID(rawValue: json["id"]?.stringValue ?? "")
         title = json["title"]?.stringValue ?? ""
@@ -34,6 +38,7 @@ public struct SessionSummary: Identifiable, Equatable, Sendable {
         source = json["source"]?.stringValue
         messageCount = json["message_count"]?.intValue ?? 0
         startedAt = Self.startDate(json["started_at"])
+        activityAt = Self.startDate(json["last_active"])
     }
     public var displayTitle: String { title.isEmpty ? "Untitled conversation" : title }
 

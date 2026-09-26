@@ -32,8 +32,9 @@ struct IOSChatView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 14) {
                             contextHeader
+                            ChannelHistoryControls(model: model)
                             if let banner = model.banner { notice(banner) }
-                            if state.messages.isEmpty {
+                            if state.messages.isEmpty && !model.isPassiveChannel {
                                 Text("What are we working on?").iosFont(24, .semibold, relativeTo: .title2)
                                 Text("Ask a question, share a file, or start with an idea.")
                                     .iosFont(16).foregroundStyle(.secondary)
@@ -84,6 +85,7 @@ struct IOSChatView: View {
                     .scrollPosition(id: $visibleMessageID, anchor: .top)
                     .simultaneousGesture(DragGesture(minimumDistance: 12).onChanged { _ in followTail = false })
                     .onAppear {
+                        if model.isPassiveChannel { followTail = false }
                         if let saved = model.place(for: state.storedID).visibleMessageID {
                             followTail = false
                             proxy.scrollTo(saved, anchor: .top)
@@ -96,16 +98,16 @@ struct IOSChatView: View {
                         model.rememberPlace(followTail ? nil : visibleMessageID, for: state.storedID)
                     }
                     .onChange(of: state.messages.last) { _, _ in
-                        if followTail { proxy.scrollTo("tail", anchor: .bottom) }
+                        if followTail && !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) }
                     }
-                    .onChange(of: state.pendingInputs.count) { _, _ in proxy.scrollTo("tail", anchor: .bottom) }
+                    .onChange(of: state.pendingInputs.count) { _, _ in if !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
                     .onChange(of: state.storedID) { _, _ in
                         focused = false
                         if let saved = model.place(for: state.storedID).visibleMessageID {
                             followTail = false
                             proxy.scrollTo(saved, anchor: .top)
                         } else {
-                            followTail = true
+                            followTail = !model.isPassiveChannel
                             proxy.scrollTo("tail", anchor: .bottom)
                         }
                     }
@@ -138,7 +140,7 @@ struct IOSChatView: View {
                             }
                             .buttonStyle(.plain).talariaGlass(cornerRadius: 18, interactive: true)
                         }
-                        composer
+                        if !model.isPassiveChannel { composer }
                     }
                     .frame(maxWidth: 792)
                     .padding(.horizontal, 16).padding(.bottom, bottomInset)

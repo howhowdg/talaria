@@ -10,6 +10,7 @@ public struct HermesRootView: View {
     private let connectSSH: (@MainActor (GatewayEndpoint, String?, String?, String?, Bool) async -> GatewayAuthentication?)?
     private let reconnectSSH: (@MainActor () async -> Void)?
     private let endSSH: (@MainActor (Bool) async -> Void)?
+    @Environment(\.scenePhase) private var scenePhase
     @State private var startingLocal = false
     @State private var selection: StoredSessionID?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -47,6 +48,7 @@ public struct HermesRootView: View {
             #endif
         }
         .tint(TalariaStyle.accent)
+        .onChange(of: scenePhase, initial: true) { _, phase in model.setChannelForeground(phase == .active) }
         .onOpenURL { url in Task { _ = await model.openHierarchyLink(url) } }
         .sheet(isPresented: $model.showConnection) {
             ConnectionView(model: model, connectSSH: connectSSH, endSSH: endSSH)
@@ -86,7 +88,7 @@ public struct HermesRootView: View {
     /// List and Run destinations retain a selected conversation for drafts, but
     /// it is not a valid implicit target for an unrelated Settings sheet.
     private var settingsConversation: ConversationState? {
-        guard let state = model.conversation, state.owner == model.currentHierarchyOwner else { return nil }
+        guard !model.isPassiveChannel, let state = model.conversation, state.owner == model.currentHierarchyOwner else { return nil }
         switch model.hierarchyDestination {
         case .home: return state.storedID == model.homeSessionID && model.homeAvailability == .available ? state : nil
         case .workspace(let id): return model.workspace(id: id)?.sessionIDs.contains(state.storedID) == true ? state : nil
@@ -441,7 +443,7 @@ private struct ConversationView: View {
                     }
                     .font(TalariaTypography.callout).frame(minHeight: 44).contentShape(Rectangle())
                 }
-                .buttonStyle(.plain).disabled(!model.isConnected).help("Model and profile settings")
+                .buttonStyle(.plain).disabled(!model.isConnected || model.isPassiveChannel).help("Model and profile settings")
                 .accessibilityLabel("Model: \(state.model.isEmpty ? "Not selected" : state.model)")
                 .accessibilityHint("Opens model and profile settings")
             }
@@ -450,7 +452,8 @@ private struct ConversationView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 22) {
-                        if state.messages.isEmpty {
+                        ChannelHistoryControls(model: model)
+                        if state.messages.isEmpty && !model.isPassiveChannel {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("What are we working on?").font(TalariaTypography.title2.weight(.medium))
                                 Text("Ask a question, share a file, or start with an idea.")
@@ -491,10 +494,11 @@ private struct ConversationView: View {
                 .onChange(of: visibleMessageID) { _, value in
                     model.rememberPlace(value, for: state.storedID)
                 }
-                .onChange(of: state.messages.last) { _, _ in if followTail { proxy.scrollTo("tail", anchor: .bottom) } }
-                .onChange(of: state.pendingInputs.count) { _, _ in if followTail { proxy.scrollTo("tail", anchor: .bottom) } }
+                .onChange(of: state.messages.last) { _, _ in if followTail && !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
+                .onChange(of: state.pendingInputs.count) { _, _ in if followTail && !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
                 .onChange(of: state.storedID) { _, _ in proxy.scrollTo("tail", anchor: .bottom) }
                 .onAppear {
+                    if model.isPassiveChannel { followTail = false }
                     if let saved = model.place(for: state.storedID).visibleMessageID {
                         followTail = false
                         #if os(macOS)
@@ -532,6 +536,7 @@ private struct ConversationView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !model.isPassiveChannel {
             composer
                 #if os(macOS)
                 .frame(maxWidth: T.composerMaxW).padding(.horizontal, T.chatInset).padding(.top, 14).padding(.bottom, 18)
@@ -539,6 +544,7 @@ private struct ConversationView: View {
                 .frame(maxWidth: 760).padding(.horizontal, contentInset).padding(.top, 8).padding(.bottom, 12)
                 #endif
                 .frame(maxWidth: .infinity)
+            }
         }
         .onChange(of: state.storedID) { _, _ in composerFocused = true }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in

@@ -344,7 +344,7 @@ struct IOSWorkspaceView: View {
         Button("Skills", systemImage: "sparkles") { showsSkills = true }
         Button("Settings", systemImage: "gearshape") {
             if model.isConnected { model.showSessionSettings = true } else { model.showConnection = true }
-        }
+        }.disabled(model.isPassiveChannel)
         Button("Change Home conversation…", systemImage: "house") { showsHomePicker = true }
             .disabled(!model.isConnected)
         Button("Connection…", systemImage: "network") { model.showConnection = true }
@@ -358,7 +358,7 @@ struct IOSWorkspaceView: View {
                     Button("Files & results", systemImage: "folder") { showFiles(id) }
                     Button("Use as Home", systemImage: "house") { Task { await model.chooseHome(id); navigate(.home) } }
                 }
-                Button("Settings", systemImage: "gearshape") { model.showSessionSettings = true }
+                Button("Settings", systemImage: "gearshape") { model.showSessionSettings = true }.disabled(model.isPassiveChannel)
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 19)).frame(width: 48, height: 48)
             }

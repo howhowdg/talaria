@@ -66,8 +66,11 @@ public struct HierarchyClassification: Codable, Equatable, Sendable {
     public var places: [String: SessionPlace] = [:]
     public var cachedHomeMessages: [ChatMessage] = []
     public var telegramTopicAssignments: [TelegramTopicAssignment] = []
+    public var pinnedChannelIDs: Set<StoredSessionID> = []
+    public var collapsedChannelSources: Set<String> = []
+    public var channelReadDates: [String: Date] = [:]
     public init() {}
-    private enum CodingKeys: String, CodingKey { case homeSessionID, workspaces, lineage, readRunIDs, archivedSessionIDs, places, cachedHomeMessages, telegramTopicAssignments }
+    private enum CodingKeys: String, CodingKey { case homeSessionID, workspaces, lineage, readRunIDs, archivedSessionIDs, places, cachedHomeMessages, telegramTopicAssignments, pinnedChannelIDs, collapsedChannelSources, channelReadDates }
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         homeSessionID = try container.decodeIfPresent(StoredSessionID.self, forKey: .homeSessionID)
@@ -78,6 +81,9 @@ public struct HierarchyClassification: Codable, Equatable, Sendable {
         places = try container.decodeIfPresent([String: SessionPlace].self, forKey: .places) ?? [:]
         cachedHomeMessages = try container.decodeIfPresent([ChatMessage].self, forKey: .cachedHomeMessages) ?? []
         telegramTopicAssignments = try container.decodeIfPresent([TelegramTopicAssignment].self, forKey: .telegramTopicAssignments) ?? []
+        pinnedChannelIDs = try container.decodeIfPresent(Set<StoredSessionID>.self, forKey: .pinnedChannelIDs) ?? []
+        collapsedChannelSources = try container.decodeIfPresent(Set<String>.self, forKey: .collapsedChannelSources) ?? []
+        channelReadDates = try container.decodeIfPresent([String: Date].self, forKey: .channelReadDates) ?? [:]
     }
 }
 
