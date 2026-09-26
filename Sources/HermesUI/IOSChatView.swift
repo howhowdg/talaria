@@ -19,12 +19,27 @@ struct IOSChatView: View {
     @State private var composerHeight: CGFloat = 52
     @State private var followTail = true
     @State private var awaitsInitialMessages = false
+    @State private var initialSavedPlace: String?
     @State private var visibleMessageID: String?
     @State private var highlightsRequest = false
     @State private var showsActivityReturn = false
     @FocusState private var focused: Bool
 
     private var bottomInset: CGFloat { keyboardVisible ? 12 : 84 }
+
+    private func restoreSavedPlace(using proxy: ScrollViewProxy) {
+        guard let saved = initialSavedPlace else { return }
+        guard let anchor = groups.first(where: { $0.messages.contains { $0.id == saved } })?.id else {
+            guard !state.messages.isEmpty, !model.isLoadingChannelHistory else { return }
+            if model.isViewingChannel && model.channelHistoryHasMore {
+                if model.channelHistoryError == nil { Task { await model.loadOlderChannelMessages() } }
+            } else { initialSavedPlace = nil }
+            return
+        }
+        visibleMessageID = anchor
+        proxy.scrollTo(anchor, anchor: .top)
+        initialSavedPlace = nil
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -87,30 +102,42 @@ struct IOSChatView: View {
                     .simultaneousGesture(DragGesture(minimumDistance: 12).onChanged { _ in followTail = false })
                     .task(id: state.storedID) {
                         focused = false
-                        followTail = !model.isPassiveChannel
+                        initialSavedPlace = model.place(for: state.storedID).visibleMessageID
+                        followTail = initialSavedPlace == nil && !model.isPassiveChannel
                         visibleMessageID = nil
                         awaitsInitialMessages = state.messages.isEmpty
                         await Task.yield()
                         guard !Task.isCancelled else { return }
                         guard !state.pendingInputs.contains(where: { $0.id == model.activityRequestFocusID }) else {
                             awaitsInitialMessages = false
+                            initialSavedPlace = nil
                             return
                         }
-                        proxy.scrollTo("tail", anchor: .bottom)
+                        if !awaitsInitialMessages {
+                            if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                            else { proxy.scrollTo("tail", anchor: .bottom) }
+                        }
                     }
                     .onChange(of: visibleMessageID) { _, id in
-                        if !followTail { model.rememberPlace(id, for: state.storedID) }
+                        if !followTail && initialSavedPlace == nil { model.rememberPlace(id, for: state.storedID) }
                     }
                     .onDisappear {
-                        model.rememberPlace(followTail ? nil : visibleMessageID, for: state.storedID)
+                        model.rememberPlace(followTail ? nil : initialSavedPlace ?? visibleMessageID, for: state.storedID)
                     }
                     .onChange(of: state.messages.last) { _, _ in
                         if awaitsInitialMessages, !state.messages.isEmpty {
                             awaitsInitialMessages = false
-                            proxy.scrollTo("tail", anchor: .bottom)
+                            if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                            else { proxy.scrollTo("tail", anchor: .bottom) }
                         } else if followTail && !model.isPassiveChannel {
                             proxy.scrollTo("tail", anchor: .bottom)
                         }
+                    }
+                    .onChange(of: state.messages.count) { _, _ in
+                        if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                    }
+                    .onChange(of: model.isLoadingChannelHistory) { _, loading in
+                        if !loading && initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
                     }
                     .onChange(of: state.pendingInputs.count) { _, _ in if !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
                     .task(id: model.activityRequestFocusID) {
