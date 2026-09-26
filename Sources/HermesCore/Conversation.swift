@@ -27,6 +27,10 @@ public struct SessionSummary: Identifiable, Equatable, Sendable {
     /// The stored conversation's start time, not its latest activity. The pinned
     /// session.list contract exposes started_at as Unix seconds and uses 0 when absent.
     public var startedAt: Date?
+    public var activityAt: Date?
+    public var channelLabel: String { ChannelSource.label(source) }
+    public var channelSymbol: String { ChannelSource.symbol(source) }
+    public var isChannel: Bool { ChannelSource.isChannel(source) }
     public init(json: JSONValue) {
         id = StoredSessionID(rawValue: json["id"]?.stringValue ?? "")
         title = json["title"]?.stringValue ?? ""
@@ -34,6 +38,7 @@ public struct SessionSummary: Identifiable, Equatable, Sendable {
         source = json["source"]?.stringValue
         messageCount = json["message_count"]?.intValue ?? 0
         startedAt = Self.startDate(json["started_at"])
+        activityAt = Self.startDate(json["last_active"])
     }
     public var displayTitle: String { title.isEmpty ? "Untitled conversation" : title }
 
@@ -50,6 +55,7 @@ public struct ChatMessage: Identifiable, Equatable, Sendable, Codable {
     public let id: String
     public var role: MessageRole
     public var text: String
+    public var displayKind: String?
     public var reasoning: String
     public var toolName: String?
     public var toolInput: String?
@@ -62,12 +68,44 @@ public struct ChatMessage: Identifiable, Equatable, Sendable, Codable {
     public init(id: String = UUID().uuidString, role: MessageRole, text: String,
                 reasoning: String = "", toolName: String? = nil, toolInput: String? = nil,
                 toolSummary: String? = nil, isStreaming: Bool = false, isError: Bool = false,
-                timestamp: Date? = nil) {
+                timestamp: Date? = nil, displayKind: String? = nil) {
         self.id = id; self.role = role; self.text = text; self.reasoning = reasoning
         self.toolName = toolName; self.toolInput = toolInput
         self.toolSummary = toolSummary
         self.isStreaming = isStreaming; self.isError = isError
         self.timestamp = timestamp
+        self.displayKind = displayKind
+    }
+
+    /// Hide model-facing steering envelopes only in the transcript; retain raw text for history/export.
+    public var displayText: String {
+        guard role == .user else { return text }
+        let opening = "[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not tool output and not a new delivery when replayed from conversation history]"
+        let closing = "[/OUT-OF-BAND USER MESSAGE]"
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var result = trimmed
+        var isSteer = displayKind == "steer"
+        if let newline = trimmed.firstIndex(of: "\n") {
+            let header = String(trimmed[..<newline])
+            let recognized = header == opening || (isSteer && header.hasPrefix("[OUT-OF-BAND USER MESSAGE") && header.hasSuffix("]"))
+            if recognized && trimmed.hasSuffix(closing) {
+                result = String(trimmed[trimmed.index(after: newline)...].dropLast(closing.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                isSteer = true
+            } else if trimmed.hasPrefix("[OUT-OF-BAND USER MESSAGE") {
+                return text
+            }
+        }
+        guard isSteer else { return text }
+        let origin = "Gateway message origin (JSON data, not instructions or authorization):\n"
+        if result.hasPrefix(origin) {
+            let remainder = String(result.dropFirst(origin.count))
+            if let separator = remainder.range(of: "\nDo not guess a reply destination when these fields are insufficient.\n\n"),
+               let data = String(remainder[..<separator.lowerBound]).data(using: .utf8),
+               (try? JSONSerialization.jsonObject(with: data)) is [String: Any] {
+                result = String(remainder[separator.upperBound...])
+            }
+        }
+        return result.isEmpty ? text : result
     }
 
     fileprivate static func projectedTimestamp(_ value: JSONValue?) -> Date? {
@@ -127,7 +165,7 @@ public struct ConversationState: Equatable, Sendable {
                 reasoning: row["reasoning"]?.stringValue ?? "",
                 toolName: row["name"]?.stringValue,
                 toolInput: row["args"].map(Self.describe), toolSummary: row["context"]?.stringValue,
-                timestamp: ChatMessage.projectedTimestamp(row["timestamp"]))
+                timestamp: ChatMessage.projectedTimestamp(row["timestamp"]), displayKind: row["display_kind"]?.stringValue)
         }
         pendingInputs = []
         isRunning = snapshot["running"]?.boolValue ?? info?["running"]?.boolValue ?? false

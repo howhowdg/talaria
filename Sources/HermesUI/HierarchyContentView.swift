@@ -34,7 +34,7 @@ struct HierarchyContentView: View {
             .padding(.horizontal, H.inset)
             .padding(.top, topInset).padding(.bottom, bottomInset)
         }
-        .refreshable { await model.refreshMobileActivity() }
+        .refreshable { await model.refreshMobileActivity(); await model.refreshChannels() }
         .simultaneousGesture(DragGesture(minimumDistance: 35).onEnded { value in
             if H.mobile && isList && value.translation.height > 60 { showsSearch = true }
         })
@@ -118,7 +118,7 @@ struct HierarchyContentView: View {
         ForEach(model.cachedHomeMessages) { message in
             VStack(alignment: .leading, spacing: 8) {
                 HierarchySectionLabel(title: message.role == .user ? "You" : model.endpoint?.name ?? "Hermes")
-                MarkdownMessage(text: message.text).hierarchyFont(H.mobile ? 16 : 12.5).lineSpacing(5)
+                MarkdownMessage(text: message.displayText).hierarchyFont(H.mobile ? 16 : 12.5).lineSpacing(5)
             }.opacity(0.7)
         }
         #endif
@@ -132,12 +132,16 @@ struct HierarchySearchResults: View {
     private var workspaces: [TalariaWorkspace] { model.workspaces.filter { matches($0.name + " " + $0.purpose) } }
     private var automations: [MobileSchedule] { model.automations.filter { matches($0.name + " " + $0.promptPreview) } }
     private var runs: [MobileRun] { model.runs.filter { matches($0.title + " " + $0.summary) } }
-    private var sessions: [SessionSummary] { model.sessions.filter { matches($0.displayTitle + " " + $0.preview) } }
+    private var sessions: [SessionSummary] {
+        let channelIDs = model.channelSessionIDs
+        return model.sessions.filter { !channelIDs.contains($0.id) && matches($0.displayTitle + " " + $0.preview) }
+    }
     private func matches(_ text: String) -> Bool { text.localizedCaseInsensitiveContains(query) }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
+            ChannelSections(model: model, onNavigate: onNavigate)
             if H.mobile { Text("Search").hierarchyFont(28, .bold).tracking(-0.4) }
-            if sessions.isEmpty && workspaces.isEmpty && automations.isEmpty && runs.isEmpty {
+            if sessions.isEmpty && workspaces.isEmpty && automations.isEmpty && runs.isEmpty && model.channelGroups.allSatisfy({ $0.sessions.isEmpty }) && model.channelSearchResults.isEmpty && !model.isSearchingChannels {
                 HierarchyEmptyState(title: "No matches", detail: "Try a different name or phrase.", symbol: "magnifyingglass")
             }
             if !sessions.isEmpty {
