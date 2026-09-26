@@ -120,7 +120,7 @@ public struct ChannelMessagePage: Sendable {
             if role != .assistant || !text.isEmpty || !reasoning.isEmpty {
                 result.append(ChatMessage(id: id, role: role, text: text, reasoning: reasoning,
                     toolName: row["tool_name"]?.stringValue ?? row["name"]?.stringValue,
-                    toolSummary: role == .tool ? text : nil, timestamp: timestamp))
+                    toolSummary: role == .tool ? text : nil, timestamp: timestamp, displayKind: row["display_kind"]?.stringValue))
             }
             for (index, call) in calls.enumerated() {
                 let function = call["function"] ?? call

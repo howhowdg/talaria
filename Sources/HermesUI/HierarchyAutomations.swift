@@ -334,9 +334,9 @@ struct HierarchyExecutionDisclosure: View {
                         VStack(alignment: .leading, spacing: 6) {
                             HierarchySectionLabel(title: message.role == .user || message.role == .system ? "Instructions" : "Hermes")
                             if message.role == .assistant {
-                                MarkdownMessage(text: message.text).hierarchyFont(H.mobile ? 14 : 12.5)
+                                MarkdownMessage(text: message.displayText).hierarchyFont(H.mobile ? 14 : 12.5)
                             } else {
-                                Text(message.text).hierarchyFont(H.mobile ? 13 : 11).monospaced()
+                                Text(message.displayText).hierarchyFont(H.mobile ? 13 : 11).monospaced()
                                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(10).background(.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
                             }
@@ -382,7 +382,7 @@ struct HierarchyExecutionDisclosure: View {
                     ForEach(section.messages) { message in
                         VStack(alignment: .leading, spacing: 6) {
                             HierarchySectionLabel(title: "Instructions")
-                            Text(message.text).hierarchyFont(11).monospaced()
+                            Text(message.displayText).hierarchyFont(11).monospaced()
                                 .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(10).background(.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
                         }

@@ -44,7 +44,7 @@ struct MacTranscriptTurn<Cards: View>: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(label).font(T.section).foregroundStyle(labelInk).padding(.leading, 4)
                         if let message {
-                            if !message.text.isEmpty || message.isStreaming { bubble(message) }
+                            if !message.displayText.isEmpty || message.isStreaming { bubble(message) }
                             if !message.reasoning.isEmpty {
                                 DisclosureGroup("Reasoning") {
                                     Text(message.reasoning).font(T.body).lineSpacing(5)
@@ -80,7 +80,7 @@ struct MacTranscriptTurn<Cards: View>: View {
         let shape = UnevenRoundedRectangle(topLeadingRadius: isUser ? 16 : 5,
             bottomLeadingRadius: 16, bottomTrailingRadius: isUser ? 5 : 16,
             topTrailingRadius: 16, style: .continuous)
-        return MarkdownMessage(text: message.text, isStreaming: message.isStreaming,
+        return MarkdownMessage(text: message.displayText, isStreaming: message.isStreaming,
                                fillsWidth: false, foregroundColor: isUser ? .white : nil)
             .font(T.body).lineSpacing(5)
             .foregroundStyle(isUser ? Color.white : message.isError ? T.failed : T.ink)

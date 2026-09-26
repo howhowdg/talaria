@@ -175,7 +175,8 @@ public enum AutomationRunResult {
             if role == .assistant && text.isEmpty && row["tool_calls"]?.arrayValue?.isEmpty != false { return nil }
             return ChatMessage(id: row["id"]?.intValue.map { "row-\($0)" } ?? "run-\(index)", role: role,
                 text: String(text.prefix(64_000)), toolName: row["name"]?.stringValue,
-                toolInput: row["args"].flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) })
+                toolInput: row["args"].flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) },
+                displayKind: row["display_kind"]?.stringValue)
         }
         // The last meaningful row must be the assistant's answer. Looking backwards
         // for any assistant message would misrepresent interim prose as a result

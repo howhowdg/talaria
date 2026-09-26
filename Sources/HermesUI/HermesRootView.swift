@@ -405,6 +405,7 @@ private struct ConversationView: View {
     @Bindable var model: HermesAppModel
     let state: ConversationState
     @State private var followTail = true
+    @State private var awaitsInitialMessages = false
     @State private var showImporter = false
     @State private var importScope: ComposerScope?
     @State private var visibleMessageID: String?
@@ -494,25 +495,28 @@ private struct ConversationView: View {
                 .onChange(of: visibleMessageID) { _, value in
                     model.rememberPlace(value, for: state.storedID)
                 }
-                .onChange(of: state.messages.last) { _, _ in if followTail && !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
+                .onChange(of: state.messages.last) { _, message in
+                    if awaitsInitialMessages, message != nil {
+                        awaitsInitialMessages = false
+                        proxy.scrollTo("tail", anchor: .bottom)
+                    } else if followTail && !model.isPassiveChannel {
+                        proxy.scrollTo("tail", anchor: .bottom)
+                    }
+                }
                 .onChange(of: state.pendingInputs.count) { _, _ in if followTail && !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
-                .onChange(of: state.storedID) { _, _ in proxy.scrollTo("tail", anchor: .bottom) }
-                .onAppear {
-                    if model.isPassiveChannel { followTail = false }
-                    if let saved = model.place(for: state.storedID).visibleMessageID {
-                        followTail = false
-                        #if os(macOS)
-                        // Older reading places may point to a tool that now
-                        // lives inside its issuing assistant's turn.
-                        let anchor = macTranscriptGroups.first {
-                            $0.id == saved || $0.tools.contains { $0.id == saved }
-                        }?.id ?? saved
-                        #else
-                        let anchor = saved
-                        #endif
-                        visibleMessageID = anchor
-                        proxy.scrollTo(anchor, anchor: .top)
-                    } else { proxy.scrollTo("tail", anchor: .bottom) }
+                .task(id: state.storedID) {
+                    // A fresh selection starts at the latest message, including
+                    // channel history that arrives after the view appears.
+                    followTail = !model.isPassiveChannel
+                    visibleMessageID = nil
+                    awaitsInitialMessages = state.messages.isEmpty
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    guard !state.pendingInputs.contains(where: { $0.id == model.activityRequestFocusID }) else {
+                        awaitsInitialMessages = false
+                        return
+                    }
+                    proxy.scrollTo("tail", anchor: .bottom)
                 }
                 .task(id: model.activityRequestFocusID) {
                     guard let requestID = model.activityRequestFocusID,
@@ -827,8 +831,8 @@ private struct MessageView: View {
                 }
                 .font(TalariaTypography.callout).foregroundStyle(.secondary)
             }
-            if !message.text.isEmpty || message.isStreaming {
-                MarkdownMessage(text: message.text, isStreaming: message.isStreaming)
+            if !message.displayText.isEmpty || message.isStreaming {
+                MarkdownMessage(text: message.displayText, isStreaming: message.isStreaming)
                     .font(.body).lineSpacing(5).textSelection(.enabled)
                     .foregroundStyle(message.isError ? Color.red : .primary)
                     .frame(maxWidth: .infinity, alignment: .leading)

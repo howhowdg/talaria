@@ -118,7 +118,7 @@ struct HierarchyContentView: View {
         ForEach(model.cachedHomeMessages) { message in
             VStack(alignment: .leading, spacing: 8) {
                 HierarchySectionLabel(title: message.role == .user ? "You" : model.endpoint?.name ?? "Hermes")
-                MarkdownMessage(text: message.text).hierarchyFont(H.mobile ? 16 : 12.5).lineSpacing(5)
+                MarkdownMessage(text: message.displayText).hierarchyFont(H.mobile ? 16 : 12.5).lineSpacing(5)
             }.opacity(0.7)
         }
         #endif

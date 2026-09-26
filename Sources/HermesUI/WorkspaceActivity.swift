@@ -104,14 +104,7 @@ private struct ToolActivityRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12).padding(.bottom, 12)
             }
-            if let output = ActivityPresentation.terminalOutput(message) {
-                Text(output).font(ActivityAppearance.mono)
-                    .foregroundStyle(Color(red: 216 / 255, green: 221 / 255, blue: 230 / 255)).lineSpacing(4)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(red: 26 / 255, green: 28 / 255, blue: 34 / 255))
-            }
+
         }
     }
 
@@ -507,12 +500,6 @@ enum ActivityPresentation {
         default: break
         }
         return ""
-    }
-
-    static func terminalOutput(_ message: ChatMessage) -> String? {
-        guard message.toolName == "terminal", let value = decode(message.text) else { return nil }
-        guard let output = value["output"]?.stringValue, output.nonempty != nil else { return nil }
-        return output
     }
 
     static func reportsFailure(_ text: String) -> Bool {

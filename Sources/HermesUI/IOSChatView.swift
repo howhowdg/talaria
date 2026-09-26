@@ -18,6 +18,7 @@ struct IOSChatView: View {
     @State private var importScope: ComposerScope?
     @State private var composerHeight: CGFloat = 52
     @State private var followTail = true
+    @State private var awaitsInitialMessages = false
     @State private var visibleMessageID: String?
     @State private var highlightsRequest = false
     @State private var showsActivityReturn = false
@@ -84,12 +85,18 @@ struct IOSChatView: View {
                     .scrollDismissesKeyboard(.interactively)
                     .scrollPosition(id: $visibleMessageID, anchor: .top)
                     .simultaneousGesture(DragGesture(minimumDistance: 12).onChanged { _ in followTail = false })
-                    .onAppear {
-                        if model.isPassiveChannel { followTail = false }
-                        if let saved = model.place(for: state.storedID).visibleMessageID {
-                            followTail = false
-                            proxy.scrollTo(saved, anchor: .top)
-                        } else { proxy.scrollTo("tail", anchor: .bottom) }
+                    .task(id: state.storedID) {
+                        focused = false
+                        followTail = !model.isPassiveChannel
+                        visibleMessageID = nil
+                        awaitsInitialMessages = state.messages.isEmpty
+                        await Task.yield()
+                        guard !Task.isCancelled else { return }
+                        guard !state.pendingInputs.contains(where: { $0.id == model.activityRequestFocusID }) else {
+                            awaitsInitialMessages = false
+                            return
+                        }
+                        proxy.scrollTo("tail", anchor: .bottom)
                     }
                     .onChange(of: visibleMessageID) { _, id in
                         if !followTail { model.rememberPlace(id, for: state.storedID) }
@@ -98,19 +105,14 @@ struct IOSChatView: View {
                         model.rememberPlace(followTail ? nil : visibleMessageID, for: state.storedID)
                     }
                     .onChange(of: state.messages.last) { _, _ in
-                        if followTail && !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) }
-                    }
-                    .onChange(of: state.pendingInputs.count) { _, _ in if !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
-                    .onChange(of: state.storedID) { _, _ in
-                        focused = false
-                        if let saved = model.place(for: state.storedID).visibleMessageID {
-                            followTail = false
-                            proxy.scrollTo(saved, anchor: .top)
-                        } else {
-                            followTail = !model.isPassiveChannel
+                        if awaitsInitialMessages, !state.messages.isEmpty {
+                            awaitsInitialMessages = false
+                            proxy.scrollTo("tail", anchor: .bottom)
+                        } else if followTail && !model.isPassiveChannel {
                             proxy.scrollTo("tail", anchor: .bottom)
                         }
                     }
+                    .onChange(of: state.pendingInputs.count) { _, _ in if !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
                     .task(id: model.activityRequestFocusID) {
                         guard let requestID = model.activityRequestFocusID,
                               state.pendingInputs.contains(where: { $0.id == requestID }) else { return }
@@ -325,7 +327,7 @@ private struct IOSMessageBubble: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     private var isUser: Bool { message.role == .user }
-    private var hasContent: Bool { !message.text.isEmpty || message.isStreaming || !message.reasoning.isEmpty }
+    private var hasContent: Bool { !message.displayText.isEmpty || message.isStreaming || !message.reasoning.isEmpty }
 
     var body: some View {
         if hasContent {
@@ -338,8 +340,8 @@ private struct IOSMessageBubble: View {
                         }
                         .iosFont(13).tint(TalariaStyle.accent)
                     }
-                    if !message.text.isEmpty || message.isStreaming {
-                        MarkdownMessage(text: message.text, isStreaming: message.isStreaming)
+                    if !message.displayText.isEmpty || message.isStreaming {
+                        MarkdownMessage(text: message.displayText, isStreaming: message.isStreaming)
                             .iosFont(16).lineSpacing(4)
                             .foregroundStyle(isUser ? .white : .primary)
                     }
