@@ -19,7 +19,7 @@ Talaria puts your conversations, workspaces, scheduled results and approvals in 
 - **Automations** — read scheduled results, inspect run history, and pause, resume or run existing automations.
 - **Activity** — see unread results and requests that need your decision, with a path back to their conversation.
 
-Talaria supports streaming replies, native Markdown, file and image attachments, persistent text drafts, model selection and existing Hermes profiles. Approval controls preserve the choices allowed by your host. Optional [Telegram topic import](docs/telegram-topics.md) connects selected topics to Home or Workspaces.
+Talaria supports streaming replies, native Markdown, file and image attachments, persistent text drafts, model selection and existing Hermes profiles. Approval controls preserve the choices allowed by your host. The source build includes [channel mirroring](docs/channel-thread-mirroring-proposal.md): browse recorded Telegram, Discord, Slack and other channel conversations, with live history refresh, paging and explicit continuation. Optional [Telegram topic import](docs/telegram-topics.md) connects selected topics to Home or Workspaces.
 
 ## Download
 

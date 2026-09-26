@@ -6,6 +6,20 @@ Intel. The public app is Developer ID signed, notarized and stapled. iOS source
 targets iOS 17 or later; an installable iPhone release is not yet published.
 Talaria does not yet provide full Hermes Desktop feature parity.
 
+## Unreleased channel mirroring
+
+The source build adds automatic platform sections, paged history, channel search,
+pinning, unread markers and renaming. Browsing a channel is passive; **Continue in
+Talaria** explicitly resumes it. **Move to channel** transfers to the platform's
+configured home channel, not necessarily the originating topic. Ordinary native
+replies are not automatically sent to Telegram. Channel browsing uses standard
+Hermes HTTP endpoints; older hosts retain limited WebSocket session access.
+
+Channel history refreshes on host change events with foreground polling as a
+fallback. Background apps do not poll. Home/Workspace topic routing still uses
+the optional extension; platform account history not recorded by Hermes is not
+imported. See the [implementation proposal](channel-thread-mirroring-proposal.md).
+
 ## Available now
 
 - **Conversations:** create and resume conversations, search the latest 100
@@ -68,8 +82,8 @@ the profile menu. Both support light/dark appearance and accessibility fallbacks
   remains explicit; the back-link is local to the connection and profile, not a
   host-guaranteed provenance reference.
 - Telegram labels are last observed names from Hermes metadata, configuration or
-  recorded topic events. Live title lookup and periodic synchronisation are not
-  implemented. Unverifiable bindings preserve the assignment and disable sending.
+  recorded topic events. Live title lookup is not implemented. The source build refreshes the visible
+  channel transcript and its explicit topic binding while in the foreground. Unverifiable bindings preserve the assignment and disable sending.
 - Automation creation/editing, delegated-task lifecycle, general Home
   reset/compression continuity, canonical result references, provider account
   setup and profile creation/editing/deletion are unfinished.

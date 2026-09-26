@@ -25,7 +25,7 @@ private actor ActivityFixture {
     func read(_ endpoint: GatewayReadEndpoint) throws -> JSONValue {
         reads.append(endpoint)
         switch endpoint {
-        case .telegramTopics: throw MobileActivityError.unavailable
+        case .telegramTopics, .channelSessions, .channelSession, .channelMessages, .channelSearch, .messagingPlatforms: throw MobileActivityError.unavailable
         case .schedules:
             if failSchedules { throw MobileActivityError.unavailable }
             return .array((0..<scheduleCount).map { .object([
@@ -96,7 +96,7 @@ final class MobileActivityTests: XCTestCase, @unchecked Sendable {
             method == "skills.manage" ? .object(["skills": .object([:])]) : .object(["projects": .array([])])
         }, read: { resource in
             switch resource {
-            case .telegramTopics: throw MobileActivityError.unavailable
+            case .telegramTopics, .channelSessions, .channelSession, .channelMessages, .channelSearch, .messagingPlatforms: throw MobileActivityError.unavailable
             case .schedules: return .array([
                 .object(["id": .string("foreign"), "profile": .string("personal")]),
                 .object(["id": .string("work-job"), "profile": .string("work")])])
@@ -119,7 +119,7 @@ final class MobileActivityTests: XCTestCase, @unchecked Sendable {
             method == "skills.manage" ? .object(["skills": .object([:])]) : .object(["projects": .array([])])
         }, read: { resource in
             switch resource {
-            case .telegramTopics: throw MobileActivityError.unavailable
+            case .telegramTopics, .channelSessions, .channelSession, .channelMessages, .channelSearch, .messagingPlatforms: throw MobileActivityError.unavailable
             case .schedules: return .array([.object(["id": .string("job")])])
             case .scheduleRuns: return .object(["runs": .array([.object(["id": .string("run")])])])
             case .sessionMessages:

@@ -10,6 +10,7 @@ public struct HermesRootView: View {
     private let connectSSH: (@MainActor (GatewayEndpoint, String?, String?, String?, Bool) async -> GatewayAuthentication?)?
     private let reconnectSSH: (@MainActor () async -> Void)?
     private let endSSH: (@MainActor (Bool) async -> Void)?
+    @Environment(\.scenePhase) private var scenePhase
     @State private var startingLocal = false
     @State private var selection: StoredSessionID?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -47,6 +48,7 @@ public struct HermesRootView: View {
             #endif
         }
         .tint(TalariaStyle.accent)
+        .onChange(of: scenePhase, initial: true) { _, phase in model.setChannelForeground(phase == .active) }
         .onOpenURL { url in Task { _ = await model.openHierarchyLink(url) } }
         .sheet(isPresented: $model.showConnection) {
             ConnectionView(model: model, connectSSH: connectSSH, endSSH: endSSH)
@@ -86,7 +88,7 @@ public struct HermesRootView: View {
     /// List and Run destinations retain a selected conversation for drafts, but
     /// it is not a valid implicit target for an unrelated Settings sheet.
     private var settingsConversation: ConversationState? {
-        guard let state = model.conversation, state.owner == model.currentHierarchyOwner else { return nil }
+        guard !model.isPassiveChannel, let state = model.conversation, state.owner == model.currentHierarchyOwner else { return nil }
         switch model.hierarchyDestination {
         case .home: return state.storedID == model.homeSessionID && model.homeAvailability == .available ? state : nil
         case .workspace(let id): return model.workspace(id: id)?.sessionIDs.contains(state.storedID) == true ? state : nil
@@ -403,6 +405,8 @@ private struct ConversationView: View {
     @Bindable var model: HermesAppModel
     let state: ConversationState
     @State private var followTail = true
+    @State private var awaitsInitialMessages = false
+    @State private var initialSavedPlace: String?
     @State private var showImporter = false
     @State private var importScope: ComposerScope?
     @State private var visibleMessageID: String?
@@ -441,7 +445,7 @@ private struct ConversationView: View {
                     }
                     .font(TalariaTypography.callout).frame(minHeight: 44).contentShape(Rectangle())
                 }
-                .buttonStyle(.plain).disabled(!model.isConnected).help("Model and profile settings")
+                .buttonStyle(.plain).disabled(!model.isConnected || model.isPassiveChannel).help("Model and profile settings")
                 .accessibilityLabel("Model: \(state.model.isEmpty ? "Not selected" : state.model)")
                 .accessibilityHint("Opens model and profile settings")
             }
@@ -450,7 +454,8 @@ private struct ConversationView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 22) {
-                        if state.messages.isEmpty {
+                        ChannelHistoryControls(model: model)
+                        if state.messages.isEmpty && !model.isPassiveChannel {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("What are we working on?").font(TalariaTypography.title2.weight(.medium))
                                 Text("Ask a question, share a file, or start with an idea.")
@@ -489,26 +494,40 @@ private struct ConversationView: View {
                 .scrollDismissesKeyboard(.interactively)
                 .scrollPosition(id: $visibleMessageID, anchor: .top)
                 .onChange(of: visibleMessageID) { _, value in
-                    model.rememberPlace(value, for: state.storedID)
+                    if initialSavedPlace == nil { model.rememberPlace(value, for: state.storedID) }
                 }
-                .onChange(of: state.messages.last) { _, _ in if followTail { proxy.scrollTo("tail", anchor: .bottom) } }
-                .onChange(of: state.pendingInputs.count) { _, _ in if followTail { proxy.scrollTo("tail", anchor: .bottom) } }
-                .onChange(of: state.storedID) { _, _ in proxy.scrollTo("tail", anchor: .bottom) }
-                .onAppear {
-                    if let saved = model.place(for: state.storedID).visibleMessageID {
-                        followTail = false
-                        #if os(macOS)
-                        // Older reading places may point to a tool that now
-                        // lives inside its issuing assistant's turn.
-                        let anchor = macTranscriptGroups.first {
-                            $0.id == saved || $0.tools.contains { $0.id == saved }
-                        }?.id ?? saved
-                        #else
-                        let anchor = saved
-                        #endif
-                        visibleMessageID = anchor
-                        proxy.scrollTo(anchor, anchor: .top)
-                    } else { proxy.scrollTo("tail", anchor: .bottom) }
+                .onChange(of: state.messages.last) { _, message in
+                    if awaitsInitialMessages, message != nil {
+                        awaitsInitialMessages = false
+                        if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                        else { proxy.scrollTo("tail", anchor: .bottom) }
+                    } else if followTail && !model.isPassiveChannel {
+                        proxy.scrollTo("tail", anchor: .bottom)
+                    }
+                }
+                .onChange(of: state.messages.count) { _, _ in
+                    if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                }
+                .onChange(of: model.isLoadingChannelHistory) { _, loading in
+                    if !loading && initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                }
+                .onChange(of: state.pendingInputs.count) { _, _ in if followTail && !model.isPassiveChannel { proxy.scrollTo("tail", anchor: .bottom) } }
+                .task(id: state.storedID) {
+                    initialSavedPlace = model.place(for: state.storedID).visibleMessageID
+                    followTail = initialSavedPlace == nil && !model.isPassiveChannel
+                    visibleMessageID = nil
+                    awaitsInitialMessages = state.messages.isEmpty
+                    await Task.yield()
+                    guard !Task.isCancelled else { return }
+                    guard !state.pendingInputs.contains(where: { $0.id == model.activityRequestFocusID }) else {
+                        awaitsInitialMessages = false
+                        initialSavedPlace = nil
+                        return
+                    }
+                    if !awaitsInitialMessages {
+                        if initialSavedPlace != nil { restoreSavedPlace(using: proxy) }
+                        else { proxy.scrollTo("tail", anchor: .bottom) }
+                    }
                 }
                 .task(id: model.activityRequestFocusID) {
                     guard let requestID = model.activityRequestFocusID,
@@ -532,6 +551,7 @@ private struct ConversationView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !model.isPassiveChannel {
             composer
                 #if os(macOS)
                 .frame(maxWidth: T.composerMaxW).padding(.horizontal, T.chatInset).padding(.top, 14).padding(.bottom, 18)
@@ -539,6 +559,7 @@ private struct ConversationView: View {
                 .frame(maxWidth: 760).padding(.horizontal, contentInset).padding(.top, 8).padding(.bottom, 12)
                 #endif
                 .frame(maxWidth: .infinity)
+            }
         }
         .onChange(of: state.storedID) { _, _ in composerFocused = true }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
@@ -582,6 +603,28 @@ private struct ConversationView: View {
             RequestReceiptView(receipt: receipt)
                 .id("request-receipt-\(receipt.id)")
         }
+    }
+
+    private func restoreSavedPlace(using proxy: ScrollViewProxy) {
+        guard let saved = initialSavedPlace else { return }
+        guard let anchor = savedAnchor(saved) else {
+            guard !state.messages.isEmpty, !model.isLoadingChannelHistory else { return }
+            if model.isViewingChannel && model.channelHistoryHasMore {
+                if model.channelHistoryError == nil { Task { await model.loadOlderChannelMessages() } }
+            } else { initialSavedPlace = nil }
+            return
+        }
+        visibleMessageID = anchor
+        proxy.scrollTo(anchor, anchor: .top)
+        initialSavedPlace = nil
+    }
+
+    private func savedAnchor(_ id: String) -> String? {
+        #if os(macOS)
+        return macTranscriptGroups.first { $0.id == id || $0.tools.contains { $0.id == id } }?.id
+        #else
+        return transcriptGroups.first { $0.messages.contains { $0.id == id } }?.id
+        #endif
     }
 
     #if os(macOS)
@@ -821,8 +864,8 @@ private struct MessageView: View {
                 }
                 .font(TalariaTypography.callout).foregroundStyle(.secondary)
             }
-            if !message.text.isEmpty || message.isStreaming {
-                MarkdownMessage(text: message.text, isStreaming: message.isStreaming)
+            if !message.displayText.isEmpty || message.isStreaming {
+                MarkdownMessage(text: message.displayText, isStreaming: message.isStreaming)
                     .font(.body).lineSpacing(5).textSelection(.enabled)
                     .foregroundStyle(message.isError ? Color.red : .primary)
                     .frame(maxWidth: .infinity, alignment: .leading)

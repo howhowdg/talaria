@@ -17,7 +17,9 @@ public final class HermesAppModel {
     public var banner: String?
     public var showConnection = false
     public var showSessionSettings = false
-    public var searchText = ""
+    public var searchText = "" {
+        didSet { if searchText != oldValue { channelSearchRevision += 1; channelSearchResults = []; channelSearchError = nil; isSearchingChannels = false } }
+    }
     public var draft = "" {
         didSet { if let composerScope { draftStore.setText(draft, for: composerScope) } }
     }
@@ -41,6 +43,38 @@ public final class HermesAppModel {
     public private(set) var hierarchyError: String?
     public private(set) var activityRequestFocusID: RPCID?
     public var hierarchyFeatures = HierarchyFeatureFlags()
+    public private(set) var channelError: String?
+    public private(set) var isLoadingChannels = false
+    public private(set) var channelDiscoveryHasMore = false
+    private var channelDiscoveryOffset = 0
+    public private(set) var channelSearchResults: [SessionSummary] = []
+    public private(set) var channelSearchError: String?
+    public private(set) var isSearchingChannels = false
+    public private(set) var channelHistoryError: String?
+    public private(set) var isLoadingChannelHistory = false
+    public private(set) var channelHandoffDestinations: [ChannelHandoffDestination] = []
+    public private(set) var channelHandoffStatus: String?
+    public private(set) var isLoadingChannelHandoff = false
+    private var channelRows: [String: [SessionSummary]] = [:]
+    private var channelOffsets: [String: Int] = [:]
+    private var channelMore: [String: Bool] = [:]
+    private var channelHistory: [StoredSessionID: [ChatMessage]] = [:]
+    private var channelHistoryCounts: [StoredSessionID: Int] = [:]
+    private var channelHistoryMore: [StoredSessionID: Bool] = [:]
+    private var channelResolvedIDs: [StoredSessionID: StoredSessionID] = [:]
+    private var continuedChannelIDs = Set<StoredSessionID>()
+    private var unavailableChannelIDs = Set<StoredSessionID>()
+    private var channelUnsettledTails: [StoredSessionID: ChatMessage] = [:]
+    private var channelsDiscovered = false
+    private var channelChangeEvents = false
+    private var channelForeground = true
+    @ObservationIgnored private let channelReader: ChannelReader?
+    @ObservationIgnored private var channelPollTask: Task<Void, Never>?
+    @ObservationIgnored private var channelHistoryRevision = 0
+    @ObservationIgnored private var channelSearchRevision = 0
+    @ObservationIgnored private var channelListRevision = 0
+    @ObservationIgnored private var channelHandoffRevision = 0
+    @ObservationIgnored private var channelHandoffSession: RuntimeSessionID?
     public private(set) var telegramTopics: [TelegramTopic] = []
     public private(set) var isLoadingTelegramTopics = false
     public private(set) var telegramTopicsError: String?
@@ -95,6 +129,7 @@ public final class HermesAppModel {
                 runDetailLoader: AutomationRunDetailLoader? = nil,
                 automationRunsLoader: AutomationRunsLoader? = nil,
                 telegramTopicsLoader: TelegramTopicsLoader? = nil,
+                channelReader: ChannelReader? = nil,
                 clientFactory: @escaping @MainActor () -> GatewayClient = { GatewayClient() }) {
         self.credentials = credentials
         self.classificationStore = HierarchyClassificationStore(defaults: defaults)
@@ -104,6 +139,7 @@ public final class HermesAppModel {
         self.runDetailLoader = runDetailLoader
         self.automationRunsLoader = automationRunsLoader
         self.telegramTopicsLoader = telegramTopicsLoader
+        self.channelReader = channelReader
         if let data = defaults.data(forKey: "gateway.endpoint") {
             savedEndpoint = try? JSONDecoder().decode(GatewayEndpoint.self, from: data)
             remembersSignIn = defaults.object(forKey: "gateway.remember") as? Bool ?? (savedEndpoint != nil)
@@ -184,7 +220,7 @@ public final class HermesAppModel {
         attachments.contains { $0.state == .reading || $0.state == .uploading }
     }
     public var canAttach: Bool {
-        isConnected && telegramDestinationIsReady && conversation != nil && !isLoadingSession && !isSubmitting && !isTransferringAttachments
+        isConnected && !isPassiveChannel && channelHandoffSession == nil && telegramDestinationIsReady && conversation != nil && !isLoadingSession && !isSubmitting && !isTransferringAttachments
             && conversation?.isRunning != true && conversation?.requiresHydration != true
             && conversation?.hasQueuedPrompt != true
             && attachments.count < AttachmentLoader.maximumCount
@@ -195,7 +231,7 @@ public final class HermesAppModel {
         }
     }
     public var canSend: Bool {
-        isConnected && telegramDestinationIsReady && !isLoadingSession && conversation != nil && conversation?.isRunning != true
+        isConnected && !isPassiveChannel && channelHandoffSession == nil && telegramDestinationIsReady && !isLoadingSession && conversation != nil && conversation?.isRunning != true
             && conversation?.requiresHydration != true
             && conversation?.hasQueuedPrompt != true
             && !isSubmitting && !isApplyingSettings && attachments.allSatisfy { $0.state == .ready }
@@ -247,6 +283,7 @@ public final class HermesAppModel {
         desiredConnection = true; remembersSignIn = remember
         defaults.set(remember, forKey: "gateway.remember")
         let stamp = UUID(); generation = stamp
+        resetChannels(preserveLoaded: sameConnection)
         resetMobileActivity(for: endpoint, preserveLoaded: sameConnection)
         releaseSnapshotWaiters()
         appliedSnapshots = [:]
@@ -337,7 +374,9 @@ public final class HermesAppModel {
             }
             await refreshSessions()
             await refreshTelegramTopics()
+            await refreshChannels()
             guard generation == stamp, isConnected else { return }
+            startChannelPolling()
             if homeSessionID != nil { await navigate(to: .home) }
             else if let previous {
                 await openSession(previous, force: true)
@@ -369,6 +408,7 @@ public final class HermesAppModel {
     public func sshTunnelExited() async {
         guard endpoint?.ssh != nil, desiredConnection else { return }
         generation = UUID(); receiver?.cancel(); refreshTask?.cancel()
+        resetChannels(preserveLoaded: true)
         isConnected = false; isConnecting = false
         resetMobileActivity(preserveLoaded: true)
         releaseSnapshotWaiters(); cancelAttachmentTransfers()
@@ -384,6 +424,7 @@ public final class HermesAppModel {
         isConnected = false; isConnecting = false
         let oldSession = session; session = nil; token = nil; activeEndpoint = nil
         let stamp = UUID(); generation = stamp; receiver?.cancel(); refreshTask?.cancel()
+        resetChannels(preserveLoaded: true)
         resetMobileActivity(preserveLoaded: true)
         releaseSnapshotWaiters()
         cancelAttachmentTransfers()
@@ -437,7 +478,12 @@ public final class HermesAppModel {
                 "profile": .string(endpoint.profile), "limit": .number(100)
             ]))
             guard generation == stamp, revision == listRevision else { return }
-            sessions = (result["sessions"]?.arrayValue ?? []).map(SessionSummary.init).filter { !$0.id.rawValue.isEmpty }
+            let incoming = (result["sessions"]?.arrayValue ?? []).map(SessionSummary.init).filter { !$0.id.rawValue.isEmpty }
+            let keep = Set(telegramTopics.map(\.currentSessionID)).union(hierarchyClassification.pinnedChannelIDs)
+            let incomingIDs = Set(incoming.map(\.id))
+            let retained = sessions.filter { keep.contains($0.id) && !incomingIDs.contains($0.id) }
+            sessions = incoming + retained
+            mergeChannelRowsIntoSessions()
         } catch { if generation == stamp { banner = safeDescription(error) } }
     }
 
@@ -458,6 +504,18 @@ public final class HermesAppModel {
     }
 
     public func openSession(_ id: StoredSessionID, force: Bool = false) async {
+        if !sessions.contains(where: { $0.id == id }), !isChannelSession(id), channelsDiscovered,
+           let endpoint, let session {
+            let stamp = generation
+            do { try await hydrateChannelReference(id, endpoint: endpoint, session: session) }
+            catch { if generation == stamp { banner = safeDescription(error) }; return }
+            guard generation == stamp, isConnected else { return }
+        }
+        if isChannelSession(id) { await openChannelSession(id); return }
+        await resumeNativeSession(id, force: force)
+    }
+
+    private func resumeNativeSession(_ id: StoredSessionID, force: Bool = false) async {
         guard isConnected, !isLoadingSession, let endpoint else { return }
         let client = client
         if !force, let cached = conversations[id], !cached.requiresHydration { select(id); if id == homeSessionID { homeAvailability = .available }; return }
@@ -550,7 +608,7 @@ public final class HermesAppModel {
     }
 
     public func stop() async {
-        guard isConnected, let id = selectedID, let state = conversations[id] else { return }
+        guard isConnected, !isPassiveChannel, let id = selectedID, let state = conversations[id] else { return }
         let client = client
         let stamp = generation
         do {
@@ -588,7 +646,7 @@ public final class HermesAppModel {
     }
 
     public func loadSettings(refresh: Bool = false) async {
-        guard isConnected, let endpoint else { return }
+        guard isConnected, !isPassiveChannel, let endpoint else { return }
         let client = client; let stamp = generation; let selected = selectedID
         settingsRevision += 1; let revision = settingsRevision
         isLoadingSettings = true; settingsError = nil
@@ -822,6 +880,7 @@ public final class HermesAppModel {
         case .connected: isConnected = true
         case .disconnected(let reason):
             isConnected = false
+            resetChannels(preserveLoaded: true)
             resetMobileActivity(preserveLoaded: true)
             releaseSnapshotWaiters()
             cancelAttachmentTransfers()
@@ -866,13 +925,16 @@ public final class HermesAppModel {
                 if state.storedID == homeSessionID { homeAvailability = .available; cacheHomeTranscript() }
             } catch { banner = safeDescription(error) }
         case .event(let event):
+            if event.type == "gateway.ready" { channelChangeEvents = event.payload["change_events"]?.boolValue == true }
             if event.type == "request.cancel", let raw = event.payload["id"]?.stringValue {
                 pendingRequests.removeValue(forKey: .string(raw))
             }
             for id in Array(conversations.keys) {
+                if isChannelSession(id), !continuedChannelIDs.contains(id) { continue }
                 conversations[id]?.apply(event)
                 if let state = conversations[id], state.storedID != id {
                     conversations.removeValue(forKey: id); conversations[state.storedID] = state
+                    moveChannelIdentity(from: id, to: state.storedID)
                     moveComposer(from: ComposerScope(owner: state.owner, sessionID: id),
                                  to: ComposerScope(owner: state.owner, sessionID: state.storedID))
                     if selectedID == id { selectedID = state.storedID }
@@ -881,7 +943,13 @@ public final class HermesAppModel {
                 }
             }
             updateMobilePendingInputs()
-            if event.type == "message.complete" { cacheHomeTranscript() }
+            if event.type == "message.complete" {
+                cacheHomeTranscript()
+                for state in conversations.values where continuedChannelIDs.contains(state.storedID)
+                    && (event.sessionID == state.runtimeID.rawValue || event.sessionID == state.storedID.rawValue) {
+                    channelUnsettledTails[state.storedID] = state.messages.last { $0.role == .assistant || $0.role == .user }
+                }
+            }
             for state in conversations.values {
                 invalidateAttachments(for: state)
                 if event.type == "message.complete", event.sessionID == state.runtimeID.rawValue || event.sessionID == state.storedID.rawValue {
@@ -904,6 +972,8 @@ public final class HermesAppModel {
                     try? await Task.sleep(for: .milliseconds(300))
                     guard !Task.isCancelled else { return }
                     await self?.refreshSessions()
+                    await self?.refreshChannels()
+                    await self?.refreshVisibleChannel()
                 }
             }
         case .request(let request):
@@ -1254,11 +1324,12 @@ extension HermesAppModel {
         }
     }
     public func place(for sessionID: StoredSessionID) -> SessionPlace {
-        hierarchyClassification.places[sessionID.rawValue] ?? SessionPlace()
+        guard let owner = currentHierarchyOwner else { return SessionPlace() }
+        return classificationStore.place(for: sessionID, owner: owner)
     }
     public func rememberPlace(_ messageID: String?, for sessionID: StoredSessionID) {
         guard let owner = currentHierarchyOwner else { return }
-        classificationStore.update(for: owner) { $0.places[sessionID.rawValue] = SessionPlace(visibleMessageID: messageID) }
+        classificationStore.rememberPlace(messageID, for: sessionID, owner: owner)
     }
     public func markRunRead(_ id: String) {
         guard let owner = currentHierarchyOwner, let run = runs.first(where: { $0.id == id }),
@@ -1461,5 +1532,499 @@ extension HermesAppModel {
                 await self.refreshAutomationRuns(id)
             }
         }
+    }
+}
+
+// Channel transcripts share the ordinary renderer, but only an explicit continuation
+// attaches a runtime. Browsing must never acquire the messaging agent's session.
+extension HermesAppModel {
+    /// Take one snapshot when filtering a list, rather than scanning every source per row.
+    public var channelSessionIDs: Set<StoredSessionID> {
+        Set(sessions.filter(\.isChannel).map(\.id))
+            .union(channelRows.values.flatMap { $0.map(\.id) })
+            .union(telegramTopics.map(\.currentSessionID))
+            .union(channelHistory.keys).union(continuedChannelIDs).union(unavailableChannelIDs)
+    }
+
+    public func isChannelSession(_ id: StoredSessionID) -> Bool {
+        sessions.contains { $0.id == id && $0.isChannel }
+            || channelRows.values.contains { $0.contains { $0.id == id } }
+            || telegramTopics.contains { $0.currentSessionID == id }
+            || channelHistory[id] != nil || continuedChannelIDs.contains(id) || unavailableChannelIDs.contains(id)
+    }
+    public var isPassiveChannel: Bool {
+        selectedID.map { isChannelSession($0) && !continuedChannelIDs.contains($0) } ?? false
+    }
+    public var isViewingChannel: Bool {
+        switch hierarchyDestination {
+        case .home, .workspace, .conversation: selectedID.map(isChannelSession) ?? false
+        default: false
+        }
+    }
+    public var channelHistoryHasMore: Bool { selectedID.flatMap { channelHistoryMore[$0] } ?? false }
+    public var pinnedChannelSessions: [SessionSummary] {
+        channelVisibleRows.filter { isChannelPinned($0.id) }
+    }
+    private var channelVisibleRows: [SessionSummary] {
+        sessions.filter {
+            ($0.isChannel || (unavailableChannelIDs.contains($0.id) && isChannelPinned($0.id))) && !hierarchyClassification.archivedSessionIDs.contains($0.id)
+                && (searchText.isEmpty || $0.displayTitle.localizedCaseInsensitiveContains(searchText)
+                    || $0.preview.localizedCaseInsensitiveContains(searchText)
+                    || $0.channelLabel.localizedCaseInsensitiveContains(searchText))
+        }.sorted { ($0.activityAt ?? $0.startedAt ?? .distantPast) > ($1.activityAt ?? $1.startedAt ?? .distantPast) }
+    }
+    public var channelGroups: [ChannelGroup] {
+        let groups = Dictionary(grouping: channelVisibleRows.filter { !isChannelPinned($0.id) }, by: { $0.source ?? "" })
+        return groups.map { source, rows in
+            ChannelGroup(source: source, sessions: rows, hasMore: channelMore[source] ?? false)
+        }.sorted { ($0.sessions.first?.activityAt ?? $0.sessions.first?.startedAt ?? .distantPast)
+            > ($1.sessions.first?.activityAt ?? $1.sessions.first?.startedAt ?? .distantPast) }
+    }
+    public func isChannelPinned(_ id: StoredSessionID) -> Bool { hierarchyClassification.pinnedChannelIDs.contains(id) }
+    public func toggleChannelPin(_ id: StoredSessionID) {
+        guard let owner = currentHierarchyOwner else { return }
+        classificationStore.update(for: owner) {
+            if !$0.pinnedChannelIDs.insert(id).inserted { $0.pinnedChannelIDs.remove(id) }
+        }
+    }
+    public func isChannelCollapsed(_ source: String) -> Bool { hierarchyClassification.collapsedChannelSources.contains(source) }
+    public func toggleChannelCollapsed(_ source: String) {
+        guard let owner = currentHierarchyOwner else { return }
+        classificationStore.update(for: owner) {
+            if !$0.collapsedChannelSources.insert(source).inserted { $0.collapsedChannelSources.remove(source) }
+        }
+    }
+    public func isChannelUnread(_ session: SessionSummary) -> Bool {
+        guard let activity = session.activityAt else { return false }
+        return activity > (hierarchyClassification.channelReadDates[session.id.rawValue] ?? .distantPast)
+    }
+    private func markChannelRead(_ id: StoredSessionID) {
+        guard channelForeground, let owner = currentHierarchyOwner,
+              let activity = sessions.first(where: { $0.id == id })?.activityAt else { return }
+        classificationStore.update(for: owner) { $0.channelReadDates[id.rawValue] = activity }
+    }
+    private func resetChannels(preserveLoaded: Bool) {
+        channelPollTask?.cancel(); channelPollTask = nil
+        channelListRevision += 1; channelHistoryRevision += 1; channelSearchRevision += 1; channelHandoffRevision += 1
+        isLoadingChannels = false; isLoadingChannelHistory = false; isSearchingChannels = false
+        isLoadingChannelHandoff = false; channelHandoffSession = nil
+        channelHandoffDestinations = []; channelHandoffStatus = nil
+        channelChangeEvents = false; channelsDiscovered = false
+        continuedChannelIDs = []; channelUnsettledTails = [:]; channelSearchResults = []; channelSearchError = nil
+        if !preserveLoaded {
+            channelRows = [:]; channelOffsets = [:]; channelMore = [:]
+            channelDiscoveryOffset = 0; channelDiscoveryHasMore = false
+            channelHistory = [:]; channelHistoryCounts = [:]; channelHistoryMore = [:]; channelResolvedIDs = [:]; unavailableChannelIDs = []
+            channelError = nil; channelHistoryError = nil
+        }
+    }
+    private func readChannel(_ resource: GatewayReadEndpoint, endpoint: GatewayEndpoint, session: GatewaySession) async throws -> JSONValue {
+        let stamp = generation
+        do {
+            if let channelReader { return try await channelReader(session, resource) }
+            return try await GatewayReader(session: session).read(resource)
+        } catch {
+            await recoverChannelSignIn(error, generation: stamp)
+            throw error
+        }
+    }
+    private func recoverChannelSignIn(_ error: Error, generation stamp: UUID) async {
+        guard generation == stamp, error as? GatewayTransportError == .sessionExpired else { return }
+        await disconnect()
+        // disconnect retains cached transcripts and drafts while stopping all polling.
+        // A concurrent reconnect owns its own UI and must not inherit this prompt.
+        guard !isConnected, !isConnecting else { return }
+        let message = GatewayTransportError.sessionExpired.localizedDescription
+        channelError = message; channelHistoryError = message; banner = message
+        showConnection = true
+    }
+    private func mergeChannelRowsIntoSessions() {
+        var positions = Dictionary(sessions.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
+        for row in channelRows.values.flatMap({ $0 }) {
+            if let index = positions[row.id] { sessions[index] = row }
+            else { positions[row.id] = sessions.count; sessions.append(row) }
+        }
+    }
+    private func mergeChannelSummaries(_ incoming: [SessionSummary], source: String, replace: Bool = false) {
+        var rows = replace ? [] : channelRows[source] ?? []
+        var positions = Dictionary(rows.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
+        for row in incoming {
+            if let index = positions[row.id] { rows[index] = row }
+            else { positions[row.id] = rows.count; rows.append(row) }
+        }
+        channelRows[source] = rows
+    }
+    private var protectedChannelIDs: Set<StoredSessionID> {
+        Set(workspaces.flatMap(\.sessionIDs)).union(hierarchyClassification.pinnedChannelIDs)
+            .union(hierarchyClassification.archivedSessionIDs)
+            .union([homeSessionID, selectedID].compactMap { $0 })
+    }
+    private func hydrateChannelReference(_ id: StoredSessionID, endpoint: GatewayEndpoint, session: GatewaySession) async throws {
+        let stamp = generation
+        do {
+            let row = try await readChannel(.channelSession(id: id.rawValue), endpoint: endpoint, session: session)
+            guard generation == stamp, isConnected else { return }
+            guard row["profile"]?.stringValue == nil || row["profile"]?.stringValue == endpoint.profile else { throw GatewayTransportError.invalidResponse }
+            let summary = SessionSummary(json: row)
+            guard summary.id == id else { throw GatewayTransportError.invalidResponse }
+            unavailableChannelIDs.remove(id)
+            if summary.isChannel { mergeChannelSummaries([summary], source: summary.source ?? "") }
+            if let index = sessions.firstIndex(where: { $0.id == id }) { sessions[index] = summary }
+            else { sessions.append(summary) }
+        } catch GatewayTransportError.httpStatus(404) {
+            guard generation == stamp, isConnected else { return }
+            // A missing individual record is not an unsupported list endpoint.
+            // Keep an explicit pin removable, and never implicitly resume missing history.
+            unavailableChannelIDs.insert(id)
+            if !sessions.contains(where: { $0.id == id }) {
+                sessions.append(SessionSummary(json: .object(["id": .string(id.rawValue),
+                    "title": .string("Unavailable conversation · " + String(id.rawValue.prefix(12)))])))
+            }
+        }
+    }
+    private func channelWindow(source: String?, through: Int, endpoint: GatewayEndpoint, session: GatewaySession) async throws -> (rows: [SessionSummary], offset: Int, hasMore: Bool) {
+        var rows: [SessionSummary] = []; var offset = 0; var hasMore = true
+        // ponytail: refresh the loaded window; use host cursors if very large histories make this costly.
+        while offset < max(100, through), hasMore {
+            try Task.checkCancellation()
+            let page = try ChannelSessionPage(response: await readChannel(.channelSessions(source: source, limit: 100, offset: offset), endpoint: endpoint, session: session), profile: endpoint.profile, source: source)
+            rows += page.sessions; hasMore = page.hasMore(offset: offset, limit: 100); offset += 100
+        }
+        return (rows, offset, hasMore)
+    }
+    public func refreshChannels() async {
+        guard isConnected, !isLoadingChannels, let endpoint, let session else { return }
+        let stamp = generation; channelListRevision += 1; let revision = channelListRevision
+        isLoadingChannels = true
+        defer { if generation == stamp, revision == channelListRevision { isLoadingChannels = false } }
+        do {
+            let seed = try await channelWindow(source: nil, through: channelDiscoveryOffset, endpoint: endpoint, session: session)
+            guard generation == stamp, revision == channelListRevision, isConnected else { return }
+            // Probe each known platform on first connection so one busy platform
+            // cannot bury every older conversation from another platform.
+            let sources = Set(seed.rows.compactMap(\.source)).union(channelRows.filter { !$0.value.isEmpty }.keys)
+                .union(channelsDiscovered ? [] : ChannelSource.known)
+            channelDiscoveryOffset = seed.offset; channelDiscoveryHasMore = seed.hasMore
+            for row in seed.rows { mergeChannelSummaries([row], source: row.source ?? "") }
+            for source in sources.sorted() {
+                let page = try await channelWindow(source: source, through: channelOffsets[source] ?? 100, endpoint: endpoint, session: session)
+                guard generation == stamp, revision == channelListRevision, isConnected else { return }
+                let incomingIDs = Set(page.rows.map(\.id))
+                let retainedIDs = protectedChannelIDs
+                let retained = (channelRows[source] ?? []).filter { retainedIDs.contains($0.id) && !incomingIDs.contains($0.id) }
+                // Replace the authoritative loaded window, not just its first page.
+                sessions.removeAll { $0.source == source && !incomingIDs.contains($0.id) && !retainedIDs.contains($0.id) }
+                mergeChannelSummaries(page.rows + retained, source: source, replace: true)
+                channelOffsets[source] = page.offset; channelMore[source] = page.hasMore
+            }
+            mergeChannelRowsIntoSessions(); channelsDiscovered = true; channelError = nil
+            let references = protectedChannelIDs
+            for id in references where !sessions.contains(where: { $0.id == id }) || unavailableChannelIDs.contains(id) {
+                do { try await hydrateChannelReference(id, endpoint: endpoint, session: session) }
+                catch {
+                    guard generation == stamp, revision == channelListRevision else { return }
+                    channelError = "Saved conversation refresh failed. " + safeDescription(error)
+                }
+                guard generation == stamp, revision == channelListRevision, isConnected else { return }
+            }
+            mergeChannelRowsIntoSessions()
+        } catch {
+            guard generation == stamp, revision == channelListRevision else { return }
+            mergeChannelRowsIntoSessions()
+            if error is CancellationError { return }
+            if error as? GatewayTransportError == .httpStatus(404) {
+                channelError = "This host does not support channel discovery. Only its loaded conversations are shown."
+            } else { channelError = "Channel refresh failed. " + safeDescription(error) }
+        }
+    }
+    public func loadMoreChannels(source: String) async {
+        guard isConnected, !isLoadingChannels, let endpoint, let session else { return }
+        let stamp = generation; channelListRevision += 1; let revision = channelListRevision
+        let offset = channelOffsets[source] ?? 0
+        isLoadingChannels = true
+        defer { if generation == stamp, revision == channelListRevision { isLoadingChannels = false } }
+        do {
+            let page = try ChannelSessionPage(response: await readChannel(.channelSessions(source: source, limit: 100, offset: offset), endpoint: endpoint, session: session), profile: endpoint.profile, source: source)
+            guard generation == stamp, revision == channelListRevision, isConnected else { return }
+            mergeChannelSummaries(page.sessions, source: source)
+            channelOffsets[source] = offset + 100
+            channelMore[source] = page.hasMore(offset: offset, limit: 100)
+            mergeChannelRowsIntoSessions(); channelError = nil
+        } catch { if generation == stamp, revision == channelListRevision { channelError = safeDescription(error) } }
+    }
+    public func loadMoreChannelSources() async {
+        guard isConnected, !isLoadingChannels, let endpoint, let session else { return }
+        let stamp = generation; channelListRevision += 1; let revision = channelListRevision
+        let offset = channelDiscoveryOffset
+        isLoadingChannels = true
+        defer { if generation == stamp, revision == channelListRevision { isLoadingChannels = false } }
+        do {
+            let page = try ChannelSessionPage(response: await readChannel(.channelSessions(source: nil, limit: 100, offset: offset), endpoint: endpoint, session: session), profile: endpoint.profile, source: nil)
+            guard generation == stamp, revision == channelListRevision, isConnected else { return }
+            for row in page.sessions { mergeChannelSummaries([row], source: row.source ?? "") }
+            channelDiscoveryOffset = offset + 100
+            channelDiscoveryHasMore = page.hasMore(offset: offset, limit: 100)
+            for source in Set(page.sessions.compactMap(\.source)) where channelOffsets[source] == nil { channelMore[source] = true }
+            mergeChannelRowsIntoSessions(); channelError = nil
+        } catch { if generation == stamp, revision == channelListRevision { channelError = safeDescription(error) } }
+    }
+    public func searchChannelHistory() async {
+        guard isConnected, let endpoint, let session else { return }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        channelSearchRevision += 1; let revision = channelSearchRevision; let stamp = generation
+        channelSearchResults = []; channelSearchError = nil
+        guard !query.isEmpty else { isSearchingChannels = false; return }
+        isSearchingChannels = true
+        defer { if generation == stamp, revision == channelSearchRevision { isSearchingChannels = false } }
+        do {
+            let response = try await readChannel(.channelSearch(query: query), endpoint: endpoint, session: session)
+            guard generation == stamp, revision == channelSearchRevision, query == searchText.trimmingCharacters(in: .whitespacesAndNewlines), isConnected else { return }
+            guard let results = response["results"]?.arrayValue else { throw GatewayTransportError.invalidResponse }
+            var seen = Set<StoredSessionID>()
+            for result in results {
+                guard result["profile"]?.stringValue == nil || result["profile"]?.stringValue == endpoint.profile else { throw GatewayTransportError.invalidResponse }
+                var row = result.objectValue ?? [:]
+                row["id"] = result["session_id"] ?? result["id"]
+                row["preview"] = result["snippet"] ?? result["preview"]
+                let summary = SessionSummary(json: .object(row))
+                if summary.isChannel, !summary.id.rawValue.isEmpty, seen.insert(summary.id).inserted {
+                    channelSearchResults.append(summary)
+                    mergeChannelSummaries([summary], source: summary.source ?? "")
+                }
+            }
+            mergeChannelRowsIntoSessions()
+        } catch { if generation == stamp, revision == channelSearchRevision { channelSearchError = safeDescription(error) } }
+    }
+    private func openChannelSession(_ id: StoredSessionID) async {
+        guard isConnected, !isLoadingSession, let owner = currentHierarchyOwner else { return }
+        channelHistoryRevision += 1; isLoadingChannelHistory = false; channelHistoryError = nil
+        if conversations[id] == nil {
+            do {
+                var state = try ConversationState(snapshot: .object([
+                    "session_id": .string("mirror:" + id.rawValue), "stored_session_id": .string(id.rawValue),
+                    "info": .object(["title": .string(sessions.first { $0.id == id }?.displayTitle ?? "Conversation")])
+                ]), owner: owner)
+                state.messages = channelHistory[id] ?? []; state.requiresHydration = true
+                conversations[id] = state
+            } catch { channelHistoryError = safeDescription(error); return }
+        }
+        select(id)
+        await refreshChannelHistory()
+        if id == homeSessionID { homeAvailability = channelHistoryError.map(HomeAvailability.failed) ?? .available; cacheHomeTranscript() }
+    }
+    public func refreshChannelHistory() async { await loadChannelHistory(older: false) }
+    public func loadOlderChannelMessages() async { await loadChannelHistory(older: true) }
+    private func loadChannelHistory(older: Bool) async {
+        guard isConnected, !isLoadingChannelHistory, let id = selectedID, isChannelSession(id),
+              conversations[id]?.isRunning != true, !isSubmitting,
+              let endpoint, let session else { return }
+        let stamp = generation; channelHistoryRevision += 1; let revision = channelHistoryRevision
+        let baseline = conversations[id]?.messages
+        isLoadingChannelHistory = true
+        defer { if generation == stamp, revision == channelHistoryRevision { isLoadingChannelHistory = false } }
+        do {
+            // Re-read the loaded window when paging: latest offsets shift whenever
+            // another client appends a turn. Stable persisted IDs preserve row identity.
+            let desired = max(100, channelHistoryCounts[id] ?? 100) + (older ? 100 : 0)
+            var messages: [ChatMessage] = []; var count = 0; var hasMore = true; var resolved = id
+            while count < desired && hasMore {
+                let limit = min(100, desired - count)
+                let page = try ChannelMessagePage(response: await readChannel(.channelMessages(id: id.rawValue, limit: limit, offset: count), endpoint: endpoint, session: session), profile: endpoint.profile, requestedID: id)
+                guard generation == stamp, revision == channelHistoryRevision, selectedID == id, isConnected else { return }
+                guard page.offset == count, page.limit == limit, count == 0 || resolved == page.resolvedID else { throw GatewayTransportError.invalidResponse }
+                messages = page.messages + messages; resolved = page.resolvedID
+                count += page.returned; hasMore = page.returned >= limit
+            }
+            guard conversations[id]?.isRunning != true, !isSubmitting,
+                  isPassiveChannel || conversations[id]?.messages == baseline else { return }
+            var seen = Set<String>()
+            messages = messages.filter { seen.insert($0.id).inserted }
+            // A new tail must not evict history the user already scrolled to.
+            let old = channelHistory[id] ?? []
+            if let unsettled = channelUnsettledTails[id] {
+                let oldIDs = Set(old.map(\.id))
+                guard messages.contains(where: { $0.role == unsettled.role && $0.text == unsettled.text && !oldIDs.contains($0.id) }) else { return }
+                channelUnsettledTails.removeValue(forKey: id)
+            }
+            let retained = hasMore ? old.filter { !seen.contains($0.id) } : []
+            channelHistory[id] = retained + messages
+            channelHistoryCounts[id] = max(count, channelHistory[id]?.count ?? count)
+            channelHistoryMore[id] = hasMore; channelResolvedIDs[id] = resolved
+            conversations[id]?.messages = channelHistory[id] ?? []
+            if isPassiveChannel { conversations[id]?.requiresHydration = true; conversations[id]?.status = "Mirrored conversation" }
+            channelHistoryError = nil; markChannelRead(id)
+        } catch {
+            guard generation == stamp, revision == channelHistoryRevision, selectedID == id else { return }
+            channelHistoryError = "Conversation refresh failed. " + safeDescription(error)
+        }
+    }
+    private func moveChannelIdentity(from old: StoredSessionID, to new: StoredSessionID) {
+        guard old != new, isChannelSession(old) else { return }
+        if continuedChannelIDs.remove(old) != nil { continuedChannelIDs.insert(new) }
+        channelHistory[new] = channelHistory[old]
+        channelHistoryCounts[new] = channelHistoryCounts[old]
+        channelHistoryMore[new] = channelHistoryMore[old]
+        channelUnsettledTails[new] = channelUnsettledTails.removeValue(forKey: old)
+        channelResolvedIDs[old] = new; channelResolvedIDs[new] = new
+        if let previous = sessions.first(where: { $0.id == old }), !sessions.contains(where: { $0.id == new }) {
+            var json: [String: JSONValue] = ["id": .string(new.rawValue), "title": .string(previous.title)]
+            if let source = previous.source { json["source"] = .string(source) }
+            let summary = SessionSummary(json: .object(json))
+            sessions.append(summary)
+            if let source = previous.source { mergeChannelSummaries([summary], source: source) }
+        }
+        if let owner = currentHierarchyOwner {
+            classificationStore.update(for: owner) { value in
+                if value.homeSessionID == old { value.homeSessionID = new }
+                for index in value.workspaces.indices {
+                    value.workspaces[index].sessionIDs = value.workspaces[index].sessionIDs.map { $0 == old ? new : $0 }
+                }
+                if value.pinnedChannelIDs.remove(old) != nil { value.pinnedChannelIDs.insert(new) }
+                if value.archivedSessionIDs.remove(old) != nil { value.archivedSessionIDs.insert(new) }
+                value.channelReadDates[new.rawValue] = value.channelReadDates[old.rawValue]
+            }
+            classificationStore.rememberPlace(classificationStore.place(for: old, owner: owner).visibleMessageID,
+                                              for: new, owner: owner)
+        }
+        if hierarchyDestination == .conversation(old) { hierarchyDestination = .conversation(new) }
+    }
+    public func continueChannelInTalaria() async {
+        guard isPassiveChannel, isConnected, !isLoadingSession, !isLoadingChannelHistory,
+              telegramDestinationIsReady, let id = selectedID else { return }
+        let stamp = generation
+        await refreshChannelHistory()
+        guard generation == stamp, selectedID == id, channelHistoryError == nil else { return }
+        let target = channelResolvedIDs[id] ?? id
+        await resumeNativeSession(target, force: true)
+        guard generation == stamp, let state = conversation,
+              state.runtimeID.rawValue != "mirror:" + state.storedID.rawValue,
+              state.storedID == target || state.storedID == id else { return }
+        continuedChannelIDs.insert(state.storedID)
+        if state.storedID != id {
+            moveChannelIdentity(from: id, to: state.storedID)
+            moveComposer(from: ComposerScope(owner: state.owner, sessionID: id), to: ComposerScope(owner: state.owner, sessionID: state.storedID))
+            channelHistory[state.storedID] = channelHistory[id]
+            channelHistoryCounts[state.storedID] = channelHistoryCounts[id]
+            if case .conversation = hierarchyDestination { hierarchyDestination = .conversation(state.storedID) }
+        }
+    }
+    public func renameChannel(id: StoredSessionID, title: String) async {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isConnected, !title.isEmpty, title.count <= 200, let endpoint, let session else { return }
+        let stamp = generation
+        do {
+            _ = try await GatewayReader(session: session).renameSession(id: id.rawValue, title: title)
+            guard generation == stamp else { return }
+            conversations[id]?.title = title
+            for key in channelRows.keys {
+                if let index = channelRows[key]?.firstIndex(where: { $0.id == id }) { channelRows[key]?[index].title = title }
+            }
+            if let index = sessions.firstIndex(where: { $0.id == id }) { sessions[index].title = title }
+            channelError = nil
+        } catch {
+            if generation == stamp { channelError = safeDescription(error) }
+            await recoverChannelSignIn(error, generation: stamp)
+        }
+    }
+    public func setChannelForeground(_ foreground: Bool) {
+        channelForeground = foreground
+        channelPollTask?.cancel(); channelPollTask = nil
+        if foreground, isConnected {
+            startChannelPolling()
+            Task { [weak self] in await self?.refreshChannels(); await self?.refreshVisibleChannel() }
+        }
+    }
+    private func refreshVisibleChannel() async {
+        guard channelForeground, isViewingChannel else { return }
+        // Existing explicit topic bindings are the only authority after /reset.
+        if telegramAssignment(for: hierarchyDestination) != nil {
+            let old = selectedID
+            await refreshTelegramTopics()
+            guard isConnected, channelForeground else { return }
+            if let assignment = telegramAssignment(for: hierarchyDestination), assignment.lastKnownSessionID != old,
+               telegramTopics.contains(where: { $0.currentSessionID == assignment.lastKnownSessionID }) {
+                await openChannelSession(assignment.lastKnownSessionID); return
+            }
+        }
+        await refreshChannelHistory()
+    }
+    private func startChannelPolling() {
+        channelPollTask?.cancel()
+        guard channelForeground, isConnected else { return }
+        let stamp = generation
+        channelPollTask = Task { [weak self] in
+            var ticks = 0
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                guard let self, self.generation == stamp, self.isConnected, self.channelForeground else { return }
+                ticks += 1
+                if !self.channelChangeEvents && ticks.isMultiple(of: 2) { await self.refreshChannels() }
+                if !self.channelChangeEvents || ticks.isMultiple(of: 6) { await self.refreshVisibleChannel() }
+                if self.channelHandoffSession != nil { await self.refreshChannelHandoffState() }
+            }
+        }
+    }
+    public func loadChannelHandoffDestinations() async {
+        guard isConnected, let endpoint, let session, !isLoadingChannelHandoff else { return }
+        let stamp = generation; channelHandoffRevision += 1; let revision = channelHandoffRevision
+        isLoadingChannelHandoff = true
+        defer { if generation == stamp, revision == channelHandoffRevision { isLoadingChannelHandoff = false } }
+        do {
+            let result = try await readChannel(.messagingPlatforms, endpoint: endpoint, session: session)
+            guard generation == stamp, revision == channelHandoffRevision else { return }
+            guard let platforms = result["platforms"]?.arrayValue else { throw GatewayTransportError.invalidResponse }
+            channelHandoffDestinations = platforms.compactMap { row in
+                guard let id = row["id"]?.stringValue, row["enabled"]?.boolValue == true,
+                      row["configured"]?.boolValue == true,
+                      let home = row["home_channel"], let chat = home["chat_id"]?.stringValue, !chat.isEmpty else { return nil }
+                let name = home["name"]?.stringValue ?? chat
+                let topic = home["thread_id"]?.stringValue.map { " · Topic " + $0 } ?? ""
+                return ChannelHandoffDestination(id: id, label: ChannelSource.label(id) + " · " + name + topic,
+                    isAvailable: row["gateway_running"]?.boolValue == true)
+            }
+        } catch { if generation == stamp, revision == channelHandoffRevision { channelHandoffStatus = safeDescription(error) } }
+    }
+    public func handoffChannel(to platform: String) async {
+        guard isConnected, !isPassiveChannel, !isLoadingChannelHandoff, !isSubmitting,
+              let state = conversation, !state.isRunning, !state.requiresHydration,
+              !state.hasQueuedPrompt, channelHandoffSession == nil,
+              channelHandoffDestinations.contains(where: { $0.id == platform && $0.isAvailable }) else { return }
+        let stamp = generation; let client = client
+        isLoadingChannelHandoff = true
+        channelHandoffSession = state.runtimeID; channelHandoffStatus = "pending"
+        defer { if generation == stamp { isLoadingChannelHandoff = false } }
+        do {
+            let result = try await client.request("handoff.request", params: .object([
+                "session_id": .string(state.runtimeID.rawValue), "profile": .string(state.owner.profile), "platform": .string(platform)]))
+            guard generation == stamp else { return }
+            guard result["queued"]?.boolValue == true else { throw GatewayTransportError.invalidResponse }
+            channelHandoffSession = state.runtimeID; channelHandoffStatus = "pending"
+        } catch {
+            if generation == stamp {
+                if error is JSONRPCError { channelHandoffSession = nil; channelHandoffStatus = safeDescription(error) }
+                else { channelHandoffStatus = "Transfer status unavailable. " + safeDescription(error) }
+            }
+        }
+    }
+    public func refreshChannelHandoffState() async {
+        guard isConnected, let runtime = channelHandoffSession, let endpoint else { return }
+        let stamp = generation
+        do {
+            let result = try await client.request("handoff.state", params: .object([
+                "session_id": .string(runtime.rawValue), "profile": .string(endpoint.profile)]))
+            guard generation == stamp, runtime == channelHandoffSession else { return }
+            let state = result["state"]?.stringValue ?? ""
+            if state.isEmpty { channelHandoffSession = nil; channelHandoffStatus = "No transfer queued."; return }
+            guard ["pending", "running", "completed", "failed"].contains(state) else { throw GatewayTransportError.invalidResponse }
+            channelHandoffStatus = state
+            if state == "completed" || state == "failed" {
+                channelHandoffSession = nil
+                if state == "completed" {
+                    for id in conversations.keys where conversations[id]?.runtimeID == runtime {
+                        continuedChannelIDs.remove(id); conversations[id]?.requiresHydration = true
+                    }
+                }
+            }
+        } catch { if generation == stamp { channelHandoffStatus = "Transfer status unavailable. " + safeDescription(error) } }
     }
 }

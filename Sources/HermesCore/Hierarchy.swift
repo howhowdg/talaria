@@ -63,11 +63,15 @@ public struct HierarchyClassification: Codable, Equatable, Sendable {
     public var lineage: [SessionLineage] = []
     public var readRunIDs: Set<String> = []
     public var archivedSessionIDs: Set<StoredSessionID> = []
+    /// Legacy positions; use the store's place/rememberPlace methods for current values.
     public var places: [String: SessionPlace] = [:]
     public var cachedHomeMessages: [ChatMessage] = []
     public var telegramTopicAssignments: [TelegramTopicAssignment] = []
+    public var pinnedChannelIDs: Set<StoredSessionID> = []
+    public var collapsedChannelSources: Set<String> = []
+    public var channelReadDates: [String: Date] = [:]
     public init() {}
-    private enum CodingKeys: String, CodingKey { case homeSessionID, workspaces, lineage, readRunIDs, archivedSessionIDs, places, cachedHomeMessages, telegramTopicAssignments }
+    private enum CodingKeys: String, CodingKey { case homeSessionID, workspaces, lineage, readRunIDs, archivedSessionIDs, places, cachedHomeMessages, telegramTopicAssignments, pinnedChannelIDs, collapsedChannelSources, channelReadDates }
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         homeSessionID = try container.decodeIfPresent(StoredSessionID.self, forKey: .homeSessionID)
@@ -78,6 +82,9 @@ public struct HierarchyClassification: Codable, Equatable, Sendable {
         places = try container.decodeIfPresent([String: SessionPlace].self, forKey: .places) ?? [:]
         cachedHomeMessages = try container.decodeIfPresent([ChatMessage].self, forKey: .cachedHomeMessages) ?? []
         telegramTopicAssignments = try container.decodeIfPresent([TelegramTopicAssignment].self, forKey: .telegramTopicAssignments) ?? []
+        pinnedChannelIDs = try container.decodeIfPresent(Set<StoredSessionID>.self, forKey: .pinnedChannelIDs) ?? []
+        collapsedChannelSources = try container.decodeIfPresent(Set<String>.self, forKey: .collapsedChannelSources) ?? []
+        channelReadDates = try container.decodeIfPresent([String: Date].self, forKey: .channelReadDates) ?? [:]
     }
 }
 
@@ -93,6 +100,29 @@ public final class HierarchyClassificationStore {
     public let syncDescription = "Stored on this device"
 
     public init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
+    public func place(for sessionID: StoredSessionID, owner: SessionOwner) -> SessionPlace {
+        if let saved = defaults.string(forKey: placeKey(sessionID, owner: owner)) {
+            return SessionPlace(visibleMessageID: saved.isEmpty ? nil : saved)
+        }
+        // Read existing positions until this session gets its first separate save.
+        return classification(for: owner).places[sessionID.rawValue] ?? SessionPlace()
+    }
+
+    public func rememberPlace(_ messageID: String?, for sessionID: StoredSessionID, owner: SessionOwner) {
+        let key = placeKey(sessionID, owner: owner)
+        let value = messageID ?? ""
+        guard defaults.string(forKey: key) != value else { return }
+        // Scrolling must not encode cached messages or invalidate organisation views.
+        // An empty string overrides a legacy position when returning to the tail.
+        defaults.set(value, forKey: key)
+    }
+
+    private func placeKey(_ sessionID: StoredSessionID, owner: SessionOwner) -> String {
+        let session = Data(sessionID.rawValue.utf8).base64EncodedString()
+        return key(owner) + ".place." + session
+    }
+
     public func classification(for owner: SessionOwner) -> HierarchyClassification {
         _ = revision
         if let saved = cache[owner] { return saved }
@@ -169,7 +199,8 @@ public enum AutomationRunResult {
             if role == .assistant && text.isEmpty && row["tool_calls"]?.arrayValue?.isEmpty != false { return nil }
             return ChatMessage(id: row["id"]?.intValue.map { "row-\($0)" } ?? "run-\(index)", role: role,
                 text: String(text.prefix(64_000)), toolName: row["name"]?.stringValue,
-                toolInput: row["args"].flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) })
+                toolInput: row["args"].flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) },
+                displayKind: row["display_kind"]?.stringValue)
         }
         // The last meaningful row must be the assistant's answer. Looking backwards
         // for any assistant message would misrepresent interim prose as a result
