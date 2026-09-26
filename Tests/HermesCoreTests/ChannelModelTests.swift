@@ -100,14 +100,52 @@ final class ChannelModelTests: XCTestCase {
         return (model, reader, directory, endpoint, { sockets })
     }
 
+    private func assertChannelSnapshot(_ model: HermesAppModel, file: StaticString = #filePath, line: UInt = #line) {
+        let ids = model.channelSessionIDs
+        let probes = ids.union(model.sessions.map(\.id)).union([
+            StoredSessionID(rawValue: "unknown"), StoredSessionID(rawValue: "default-500"),
+            StoredSessionID(rawValue: "default-0"), StoredSessionID(rawValue: "deleted-pin")
+        ])
+        for id in probes {
+            XCTAssertEqual(ids.contains(id), model.isChannelSession(id), id.rawValue, file: file, line: line)
+        }
+    }
+
+    func testChannelFilterSnapshotBenchmark() async throws {
+        let (model, _, directory, endpoint, _) = try fixture()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        await model.connect(to: endpoint, token: "fixture")
+        for _ in 0..<6 { await model.loadMoreChannels(source: "telegram") }
+        XCTAssertEqual(model.otherConversations.count, 601)
+        let clock = ContinuousClock()
+        var oldIDs: [StoredSessionID] = []
+        let oldDuration = clock.measure {
+            for _ in 0..<10 {
+                oldIDs = model.otherConversations.filter { !model.isChannelSession($0.id) }.map(\.id)
+            }
+        }
+        var snapshotIDs: [StoredSessionID] = []
+        let snapshotDuration = clock.measure {
+            for _ in 0..<10 {
+                let channelIDs = model.channelSessionIDs
+                snapshotIDs = model.otherConversations.filter { !channelIDs.contains($0.id) }.map(\.id)
+            }
+        }
+        XCTAssertEqual(snapshotIDs, oldIDs)
+        print("Channel filter, 601 channels / 10 iterations: old=\(oldDuration), snapshot=\(snapshotDuration)")
+        await model.disconnect()
+    }
+
     func testDiscoveryPagesBeyondFiveHundred() async throws {
         let (model, _, directory, endpoint, _) = try fixture()
         defer { try? FileManager.default.removeItem(at: directory) }
         await model.connect(to: endpoint, token: "fixture")
         XCTAssertEqual(model.channelGroups.first?.sessions.count, 100)
+        assertChannelSnapshot(model)
         XCTAssertEqual(model.channelGroups.first?.hasMore, true)
         for _ in 0..<6 { await model.loadMoreChannels(source: "telegram") }
         XCTAssertEqual(model.channelGroups.first?.sessions.count, 601)
+        assertChannelSnapshot(model)
         XCTAssertEqual(model.channelGroups.first?.hasMore, false)
         await model.disconnect()
     }
@@ -138,6 +176,7 @@ final class ChannelModelTests: XCTestCase {
         XCTAssertFalse(passiveMethods.contains("session.resume"))
         XCTAssertFalse(passiveMethods.contains("prompt.submit"))
         await model.continueChannelInTalaria()
+        assertChannelSnapshot(model)
         XCTAssertFalse(model.isPassiveChannel)
         let continuedMethods = await socket.methods
         XCTAssertEqual(continuedMethods.filter { $0 == "session.resume" }.count, 1)
@@ -171,6 +210,8 @@ final class ChannelModelTests: XCTestCase {
         var research = endpoint; research.profile = "research"
         await model.connect(to: research, token: "fixture")
         XCTAssertEqual(model.endpoint?.profile, "research")
+        assertChannelSnapshot(model)
+        XCTAssertFalse(model.channelSessionIDs.contains(id))
         await reader.release(); await oldRefresh.value
         XCTAssertFalse(model.isChannelPinned(id)); XCTAssertFalse(model.isChannelCollapsed("telegram"))
         XCTAssertFalse(model.sessions.contains { $0.id == id })
@@ -211,8 +252,12 @@ final class ChannelModelTests: XCTestCase {
         await model.connect(to: endpoint, token: "fixture")
         await model.openSession(StoredSessionID(rawValue: "default-0"))
         await model.continueChannelInTalaria()
+        assertChannelSnapshot(model)
         model.draft = "Keep this draft after compression"
         let socket = try XCTUnwrap(sockets().last)
+        let original = StoredSessionID(rawValue: "default-0")
+        let owner = try XCTUnwrap(model.currentHierarchyOwner)
+        model.classificationStore.rememberPlace("latest-row", for: original, owner: owner)
         let rotated = StoredSessionID(rawValue: "default-1")
         try await socket.event("session.info", sessionID: "runtime-default", payload: .object(["stored_session_id": .string(rotated.rawValue)]))
         for _ in 0..<100 {
@@ -220,6 +265,7 @@ final class ChannelModelTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(2))
         }
         XCTAssertEqual(model.selectedID, rotated)
+        XCTAssertEqual(model.classificationStore.place(for: rotated, owner: owner).visibleMessageID, "latest-row")
         XCTAssertFalse(model.isPassiveChannel)
         XCTAssertEqual(model.draft, "Keep this draft after compression")
         try await socket.event("message.start", sessionID: "runtime-default", payload: .object([:]))
@@ -249,6 +295,17 @@ final class ChannelModelTests: XCTestCase {
         XCTAssertEqual(model.conversation?.messages.filter { $0.text == "Live answer after compression" }.count, 1)
         XCTAssertEqual(model.conversation?.messages.map(\.text), later.map { $0.1 })
         XCTAssertEqual(model.draft, "Keep this draft after compression")
+        model.classificationStore.rememberPlace(nil, for: rotated, owner: owner)
+        let finalID = StoredSessionID(rawValue: "default-2")
+        model.classificationStore.rememberPlace("stale-row", for: finalID, owner: owner)
+        try await socket.event("session.info", sessionID: "runtime-default", payload: .object(["stored_session_id": .string(finalID.rawValue)]))
+        for _ in 0..<100 {
+            if model.selectedID == finalID { break }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        XCTAssertEqual(model.selectedID, finalID)
+        XCTAssertNil(model.classificationStore.place(for: finalID, owner: owner).visibleMessageID)
+        assertChannelSnapshot(model)
         await model.disconnect()
     }
 
@@ -264,6 +321,7 @@ final class ChannelModelTests: XCTestCase {
         XCTAssertEqual(model.channelGroups.first?.hasMore, false)
         await model.refreshChannels()
         XCTAssertEqual(model.channelGroups.first?.sessions.count, 601)
+        assertChannelSnapshot(model)
         XCTAssertEqual(model.channelGroups.first?.hasMore, false)
         await model.disconnect()
     }
@@ -279,6 +337,8 @@ final class ChannelModelTests: XCTestCase {
         await reader.setSessions(0)
         await model.refreshChannels()
         XCTAssertFalse(model.channelGroups.flatMap(\.sessions).contains { $0.id == id })
+        assertChannelSnapshot(model)
+        XCTAssertTrue(model.channelSessionIDs.contains(id)) // Cached history remains a channel.
         XCTAssertEqual(model.conversations[id]?.messages, cached)
         await model.disconnect()
     }
@@ -297,9 +357,11 @@ final class ChannelModelTests: XCTestCase {
         let placeholder = try XCTUnwrap(model.pinnedChannelSessions.first { $0.id == missing })
         XCTAssertTrue(placeholder.displayTitle.localizedCaseInsensitiveContains("unavailable"))
         XCTAssertEqual(model.channelGroups.first?.sessions.count, 100)
+        assertChannelSnapshot(model)
         model.toggleChannelPin(missing)
         XCTAssertFalse(model.isChannelPinned(missing))
         XCTAssertFalse(model.pinnedChannelSessions.contains { $0.id == missing })
+        assertChannelSnapshot(model)
         await model.disconnect()
     }
 

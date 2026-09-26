@@ -63,6 +63,7 @@ public struct HierarchyClassification: Codable, Equatable, Sendable {
     public var lineage: [SessionLineage] = []
     public var readRunIDs: Set<String> = []
     public var archivedSessionIDs: Set<StoredSessionID> = []
+    /// Legacy positions; use the store's place/rememberPlace methods for current values.
     public var places: [String: SessionPlace] = [:]
     public var cachedHomeMessages: [ChatMessage] = []
     public var telegramTopicAssignments: [TelegramTopicAssignment] = []
@@ -99,6 +100,29 @@ public final class HierarchyClassificationStore {
     public let syncDescription = "Stored on this device"
 
     public init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
+    public func place(for sessionID: StoredSessionID, owner: SessionOwner) -> SessionPlace {
+        if let saved = defaults.string(forKey: placeKey(sessionID, owner: owner)) {
+            return SessionPlace(visibleMessageID: saved.isEmpty ? nil : saved)
+        }
+        // Read existing positions until this session gets its first separate save.
+        return classification(for: owner).places[sessionID.rawValue] ?? SessionPlace()
+    }
+
+    public func rememberPlace(_ messageID: String?, for sessionID: StoredSessionID, owner: SessionOwner) {
+        let key = placeKey(sessionID, owner: owner)
+        let value = messageID ?? ""
+        guard defaults.string(forKey: key) != value else { return }
+        // Scrolling must not encode cached messages or invalidate organisation views.
+        // An empty string overrides a legacy position when returning to the tail.
+        defaults.set(value, forKey: key)
+    }
+
+    private func placeKey(_ sessionID: StoredSessionID, owner: SessionOwner) -> String {
+        let session = Data(sessionID.rawValue.utf8).base64EncodedString()
+        return key(owner) + ".place." + session
+    }
+
     public func classification(for owner: SessionOwner) -> HierarchyClassification {
         _ = revision
         if let saved = cache[owner] { return saved }

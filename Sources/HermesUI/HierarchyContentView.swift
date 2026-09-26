@@ -132,7 +132,10 @@ struct HierarchySearchResults: View {
     private var workspaces: [TalariaWorkspace] { model.workspaces.filter { matches($0.name + " " + $0.purpose) } }
     private var automations: [MobileSchedule] { model.automations.filter { matches($0.name + " " + $0.promptPreview) } }
     private var runs: [MobileRun] { model.runs.filter { matches($0.title + " " + $0.summary) } }
-    private var sessions: [SessionSummary] { model.sessions.filter { !model.isChannelSession($0.id) && matches($0.displayTitle + " " + $0.preview) } }
+    private var sessions: [SessionSummary] {
+        let channelIDs = model.channelSessionIDs
+        return model.sessions.filter { !channelIDs.contains($0.id) && matches($0.displayTitle + " " + $0.preview) }
+    }
     private func matches(_ text: String) -> Bool { text.localizedCaseInsensitiveContains(query) }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {

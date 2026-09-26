@@ -272,7 +272,10 @@ struct HierarchyOtherConversations: View {
     @Bindable var model: HermesAppModel
     let onNavigate: @MainActor (HierarchyDestination) -> Void
     var showTitle = true
-    private var sessions: [SessionSummary] { model.otherConversations.filter { !model.isChannelSession($0.id) } }
+    private var sessions: [SessionSummary] {
+        let channelIDs = model.channelSessionIDs
+        return model.otherConversations.filter { !channelIDs.contains($0.id) }
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ChannelSections(model: model, onNavigate: onNavigate)

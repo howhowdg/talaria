@@ -1324,11 +1324,12 @@ extension HermesAppModel {
         }
     }
     public func place(for sessionID: StoredSessionID) -> SessionPlace {
-        hierarchyClassification.places[sessionID.rawValue] ?? SessionPlace()
+        guard let owner = currentHierarchyOwner else { return SessionPlace() }
+        return classificationStore.place(for: sessionID, owner: owner)
     }
     public func rememberPlace(_ messageID: String?, for sessionID: StoredSessionID) {
         guard let owner = currentHierarchyOwner else { return }
-        classificationStore.update(for: owner) { $0.places[sessionID.rawValue] = SessionPlace(visibleMessageID: messageID) }
+        classificationStore.rememberPlace(messageID, for: sessionID, owner: owner)
     }
     public func markRunRead(_ id: String) {
         guard let owner = currentHierarchyOwner, let run = runs.first(where: { $0.id == id }),
@@ -1537,6 +1538,14 @@ extension HermesAppModel {
 // Channel transcripts share the ordinary renderer, but only an explicit continuation
 // attaches a runtime. Browsing must never acquire the messaging agent's session.
 extension HermesAppModel {
+    /// Take one snapshot when filtering a list, rather than scanning every source per row.
+    public var channelSessionIDs: Set<StoredSessionID> {
+        Set(sessions.filter(\.isChannel).map(\.id))
+            .union(channelRows.values.flatMap { $0.map(\.id) })
+            .union(telegramTopics.map(\.currentSessionID))
+            .union(channelHistory.keys).union(continuedChannelIDs).union(unavailableChannelIDs)
+    }
+
     public func isChannelSession(_ id: StoredSessionID) -> Bool {
         sessions.contains { $0.id == id && $0.isChannel }
             || channelRows.values.contains { $0.contains { $0.id == id } }
@@ -1873,8 +1882,9 @@ extension HermesAppModel {
                 if value.pinnedChannelIDs.remove(old) != nil { value.pinnedChannelIDs.insert(new) }
                 if value.archivedSessionIDs.remove(old) != nil { value.archivedSessionIDs.insert(new) }
                 value.channelReadDates[new.rawValue] = value.channelReadDates[old.rawValue]
-                value.places[new.rawValue] = value.places[old.rawValue]
             }
+            classificationStore.rememberPlace(classificationStore.place(for: old, owner: owner).visibleMessageID,
+                                              for: new, owner: owner)
         }
         if hierarchyDestination == .conversation(old) { hierarchyDestination = .conversation(new) }
     }

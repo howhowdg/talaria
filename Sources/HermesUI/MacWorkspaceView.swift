@@ -118,6 +118,7 @@ struct MacWorkspaceView<Content: View>: View {
                             .foregroundStyle(T.ink3).padding(.horizontal, 10).padding(.vertical, 6)
                     }
                     ChannelSections(model: model, onNavigate: navigate).padding(.horizontal, 10)
+                    let filteredConversations = filteredConversations
                     section("Other conversations", destination: .otherConversations, count: filteredConversations.count)
                     ForEach(filteredConversations.prefix(model.searchText.isEmpty ? 3 : 100)) { session in
                         navRow(session.displayTitle, destination: .conversation(session.id))
@@ -149,7 +150,8 @@ struct MacWorkspaceView<Content: View>: View {
         model.automations.filter { model.searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(model.searchText) }
     }
     private var filteredConversations: [SessionSummary] {
-        model.otherConversations.filter { !model.isChannelSession($0.id) && (model.searchText.isEmpty || $0.displayTitle.localizedCaseInsensitiveContains(model.searchText) || $0.preview.localizedCaseInsensitiveContains(model.searchText)) }
+        let channelIDs = model.channelSessionIDs
+        return model.otherConversations.filter { !channelIDs.contains($0.id) && (model.searchText.isEmpty || $0.displayTitle.localizedCaseInsensitiveContains(model.searchText) || $0.preview.localizedCaseInsensitiveContains(model.searchText)) }
     }
     private func section(_ title: String, destination: HierarchyDestination, count: Int? = nil) -> some View {
         HStack {
