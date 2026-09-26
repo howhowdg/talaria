@@ -879,8 +879,8 @@ extension HermesAppModelTests {
         XCTAssertFalse(model.isConnected)
         XCTAssertFalse(model.desiredConnection)
         XCTAssertFalse(model.remembersSignIn)
-        let loggedOut = await http.requests.contains { $0.url!.path.hasSuffix("/auth/logout") }
-        XCTAssertTrue(loggedOut)
+        let logout = await http.requests.last { $0.url!.path.hasSuffix("/auth/logout") }
+        XCTAssertEqual(logout?.value(forHTTPHeaderField: "Cookie"), "hermes_session_at=fixture-cookie")
         let restarted = HermesAppModel(defaults: defaults)
         XCTAssertFalse(restarted.remembersSignIn)
     }
@@ -937,6 +937,10 @@ extension HermesAppModelTests {
         XCTAssertEqual(try store.readToken(for: legacy, legacyEndpoint: legacy), "legacy-fixture")
         var changed = legacy; changed.baseURL = URL(string: "http://127.0.0.1:8643")!
         XCTAssertNil(try store.readToken(for: changed, legacyEndpoint: legacy))
+        await restored.connect(to: target, username: "user", password: "password", remember: true)
+        XCTAssertNotNil(try store.readSession(for: target))
+        await restored.signOut()
+        XCTAssertNil(try store.readSession(for: target))
         try store.saveToken("bound-fixture", for: legacy)
         XCTAssertNil(try store.read(account: legacy.id.uuidString))
         XCTAssertEqual(try store.readToken(for: legacy, legacyEndpoint: legacy), "bound-fixture")

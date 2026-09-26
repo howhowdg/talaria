@@ -411,8 +411,8 @@ public final class HermesAppModel {
                 try credentials.deleteToken(for: signedOutEndpoint)
             } catch { banner = "Sign-in could not be removed from Keychain." }
         }
-        await disconnect()
         await oldSession?.logout()
+        await disconnect()
     }
 
     private func persistSession(_ snapshot: GatewaySessionSnapshot?, endpoint: GatewayEndpoint, generation stamp: UUID) {
