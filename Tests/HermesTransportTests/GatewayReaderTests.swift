@@ -39,6 +39,20 @@ final class GatewayReaderTests: XCTestCase, @unchecked Sendable {
         XCTAssertThrowsError(try GatewayRoutes(endpoint: GatewayEndpoint(name: "Bad", baseURL: URL(string: "http://remote.test")!)))
     }
 
+    func testChannelHistoryRouteAcceptsDecodedIdentifierAndRejectsControls() throws {
+        let row = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"id":"20260922_111647_8cffaf67"}"#.utf8))
+        let id = try XCTUnwrap(row["id"]?.stringValue)
+        XCTAssertEqual(id.utf8.count, 24)
+        let routes = try GatewayRoutes(endpoint: endpoint)
+        let request = try routes.readRequest(.channelMessages(id: id, limit: 100, offset: 0), token: "fixture")
+        XCTAssertEqual(request.url?.path, "/hermes/api/sessions/\(id)/messages")
+        for control in ["\u{0}", "\n", "\u{7f}", "\u{85}", "\u{200b}"] {
+            XCTAssertThrowsError(try routes.readRequest(.channelMessages(id: id + control, limit: 100, offset: 0), token: "fixture")) {
+                XCTAssertEqual($0 as? GatewayTransportError, .invalidResponse)
+            }
+        }
+    }
+
     func testReadHandlesAuthenticationAndMalformedPayloadWithoutLeakingBody() async throws {
         let rejected = GatewayReader(endpoint: endpoint, token: "fixture", http: ReaderHTTP("secret server detail", status: 401))
         do { _ = try await rejected.read(.schedules); XCTFail("Expected authentication failure") }

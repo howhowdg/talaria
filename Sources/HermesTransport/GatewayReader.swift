@@ -152,7 +152,7 @@ extension GatewayRoutes {
 
     private func encodedSegment(_ value: String) throws -> String {
         guard !value.isEmpty, value != ".", value != "..", value.utf8.count <= 512,
-              !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains),
+              !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
               let encoded = value.addingPercentEncoding(withAllowedCharacters: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))) else {
             throw GatewayTransportError.invalidResponse
         }
