@@ -402,7 +402,9 @@ public final class HermesAppModel {
         let signedOutEndpoint = endpoint
         let oldSession = session
         // Invalidate callbacks before logout so its clearing response cannot save again.
-        remembersSignIn = false; desiredConnection = false; generation = UUID()
+        remembersSignIn = false; desiredConnection = false; isConnected = false; isConnecting = false
+        generation = UUID(); receiver?.cancel()
+        let signedOutGeneration = generation
         defaults.set(false, forKey: "gateway.remember")
         session = nil
         if let signedOutEndpoint {
@@ -411,7 +413,9 @@ public final class HermesAppModel {
                 try credentials.deleteToken(for: signedOutEndpoint)
             } catch { banner = "Sign-in could not be removed from Keychain." }
         }
+        await client.disconnect()
         await oldSession?.logout()
+        guard generation == signedOutGeneration else { return }
         await disconnect()
     }
 

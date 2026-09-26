@@ -827,10 +827,15 @@ extension HermesAppModelTests {
 private actor BasicModelHTTP: GatewayHTTPTransport {
     private(set) var requests: [URLRequest] = []
     private var loginWaiter: CheckedContinuation<Void, Never>?
+    private var logoutWaiter: CheckedContinuation<Void, Never>?
     var holdLogin = false
+    var holdLogout = false
     func holdNextLogin() { holdLogin = true }
+    func holdNextLogout() { holdLogout = true }
     func isHoldingLogin() -> Bool { loginWaiter != nil }
+    func isHoldingLogout() -> Bool { logoutWaiter != nil }
     func releaseLogin() { loginWaiter?.resume(); loginWaiter = nil }
+    func releaseLogout() { logoutWaiter?.resume(); logoutWaiter = nil }
     func data(for request: URLRequest) async throws -> GatewayHTTPResponse {
         requests.append(request)
         let path = request.url!.path
@@ -849,6 +854,7 @@ private actor BasicModelHTTP: GatewayHTTPTransport {
         if path.hasSuffix("/api/auth/ws-ticket") {
             return GatewayHTTPResponse(data: Data(#"{"ticket":"fixture-ticket","ttl_seconds":30}"#.utf8), status: 200)
         }
+        if path.hasSuffix("/auth/logout"), holdLogout { await withCheckedContinuation { logoutWaiter = $0 } }
         return GatewayHTTPResponse(data: Data("{}".utf8), status: path.hasSuffix("/auth/logout") ? 302 : 404)
     }
 }
@@ -905,6 +911,33 @@ extension HermesAppModelTests {
         XCTAssertFalse(model.desiredConnection)
         let ticketRequested = await http.requests.contains { $0.url!.path.hasSuffix("/api/auth/ws-ticket") }
         XCTAssertFalse(ticketRequested)
+    }
+
+    func testSignOutDisablesConnectionBeforeLogoutCompletes() async throws {
+        let http = BasicModelHTTP()
+        let model = HermesAppModel(defaults: try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString)),
+            clientFactory: { GatewayClient(http: http, socketFactory: { _ in AppModelSocket() }) })
+        let target = GatewayEndpoint(name: "Basic fixture", baseURL: URL(string: "http://127.0.0.1:8642")!, authentication: .basic)
+        await model.connect(to: target, username: "user", password: "password", remember: false)
+        XCTAssertTrue(model.isConnected)
+        await http.holdNextLogout()
+        let signOut = Task { await model.signOut() }
+        for _ in 0..<100 {
+            if await http.isHoldingLogout() { break }
+            await Task.yield()
+        }
+        let holding = await http.isHoldingLogout()
+        XCTAssertTrue(holding)
+        XCTAssertFalse(model.isConnected)
+        XCTAssertFalse(model.canSend)
+        let next = GatewayEndpoint(name: "Next fixture", baseURL: URL(string: "http://127.0.0.1:8643")!, authentication: .basic)
+        await model.connect(to: next, username: "user", password: "password", remember: false)
+        XCTAssertTrue(model.isConnected)
+        await http.releaseLogout()
+        await signOut.value
+        XCTAssertTrue(model.isConnected)
+        XCTAssertEqual(model.endpoint, next)
+        await model.disconnect()
     }
 }
 
