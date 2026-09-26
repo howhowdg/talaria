@@ -156,19 +156,40 @@ public struct AttachmentTransferService: Sendable {
 
     public func upload(_ attachment: StagedAttachment, workspace: String,
                        endpoint: GatewayEndpoint, token: String) async throws -> UploadedAttachment {
+        let session = try GatewaySession(endpoint: endpoint, token: token)
+        return try await upload(attachment, workspace: workspace, session: session, uploader: uploader, token: token)
+    }
+
+    public func upload(_ attachment: StagedAttachment, workspace: String,
+                       session: GatewaySession) async throws -> UploadedAttachment {
+        try await upload(attachment, workspace: workspace, session: session, uploader: GatewayUploadClient(session: session))
+    }
+
+    private func upload(_ attachment: StagedAttachment, workspace: String,
+                        session: GatewaySession, uploader: GatewayUploadClient, token: String? = nil) async throws -> UploadedAttachment {
+        let endpoint = session.endpoint
         guard endpoint.id == attachment.scope.connectionID, endpoint.profile == attachment.scope.profile else { throw AttachmentError.wrongOwner }
         try Task.checkCancellation()
         let result: GatewayUploadResult
         let relativePath: String?
         if attachment.kind == .image {
             relativePath = nil
-            result = try await uploader.uploadImage(data: attachment.data, filename: attachment.filename, endpoint: endpoint, token: token)
+            if let token {
+                result = try await uploader.uploadImage(data: attachment.data, filename: attachment.filename, endpoint: endpoint, token: token)
+            } else {
+                result = try await uploader.uploadImage(data: attachment.data, filename: attachment.filename)
+            }
         } else {
             let base = try Self.workspacePath(workspace)
             let relative = ".hermes/native-attachments/\(attachment.id.uuidString.lowercased())/\(Self.safeFilename(attachment.filename))"
             relativePath = relative
-            result = try await uploader.uploadFile(data: attachment.data, filename: attachment.filename, mimeType: attachment.mimeType,
-                                                 hostPath: base + "/" + relative, endpoint: endpoint, token: token)
+            if let token {
+                result = try await uploader.uploadFile(data: attachment.data, filename: attachment.filename, mimeType: attachment.mimeType,
+                    hostPath: base + "/" + relative, endpoint: endpoint, token: token)
+            } else {
+                result = try await uploader.uploadFile(data: attachment.data, filename: attachment.filename, mimeType: attachment.mimeType,
+                    hostPath: base + "/" + relative)
+            }
         }
         try Task.checkCancellation()
         return UploadedAttachment(id: attachment.id, scope: attachment.scope, filename: attachment.filename, kind: attachment.kind,

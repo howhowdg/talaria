@@ -48,11 +48,23 @@ public struct GatewayUploadResult: Sendable, Equatable {
 public struct GatewayUploadClient: Sendable {
     public static let maximumBytes = 20 * 1_024 * 1_024
     private let http: any GatewayHTTPTransport
+    private var session: GatewaySession?
+
+    public init(session: GatewaySession) { self.session = session; http = session }
+
+    public func uploadImage(data: Data, filename: String) async throws -> GatewayUploadResult {
+        guard let session else { throw GatewayTransportError.notConnected }
+        return try await uploadImage(data: data, filename: filename, endpoint: session.endpoint, token: nil)
+    }
+    public func uploadFile(data: Data, filename: String, mimeType: String, hostPath: String) async throws -> GatewayUploadResult {
+        guard let session else { throw GatewayTransportError.notConnected }
+        return try await uploadFile(data: data, filename: filename, mimeType: mimeType, hostPath: hostPath, endpoint: session.endpoint, token: nil)
+    }
 
     public init() { http = URLSessionGatewayNetwork() }
     init(http: any GatewayHTTPTransport) { self.http = http }
 
-    public func uploadImage(data: Data, filename: String, endpoint: GatewayEndpoint, token: String) async throws -> GatewayUploadResult {
+    public func uploadImage(data: Data, filename: String, endpoint: GatewayEndpoint, token: String?) async throws -> GatewayUploadResult {
         try validate(data: data, filename: filename)
         guard let format = GatewayImageFormat.detect(data) else { throw GatewayUploadError.unsupportedImage }
         var request = try uploadRequest(endpoint: endpoint, token: token, route: "chat/image-upload")
@@ -67,7 +79,7 @@ public struct GatewayUploadClient: Sendable {
     }
 
     public func uploadFile(data: Data, filename: String, mimeType: String, hostPath: String,
-                           endpoint: GatewayEndpoint, token: String) async throws -> GatewayUploadResult {
+                           endpoint: GatewayEndpoint, token: String?) async throws -> GatewayUploadResult {
         try validate(data: data, filename: filename)
         guard Self.validHostPath(hostPath), !mimeType.isEmpty,
               !mimeType.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
@@ -89,11 +101,14 @@ public struct GatewayUploadClient: Sendable {
         return try validatedResult(result, byteCount: data.count)
     }
 
-    private func uploadRequest(endpoint: GatewayEndpoint, token: String, route: String) throws -> URLRequest {
+    private func uploadRequest(endpoint: GatewayEndpoint, token: String?, route: String) throws -> URLRequest {
+        if let token {
         guard !token.isEmpty else { throw GatewayTransportError.missingToken }
         guard !token.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.contains($0) || CharacterSet.controlCharacters.contains($0) }) else {
             throw GatewayTransportError.authenticationRejected
         }
+        }
+        guard token != nil || session != nil else { throw GatewayTransportError.missingToken }
         // Reuse the existing endpoint validation, profile query, secret header,
         // and reverse-proxy base-path handling without putting secrets in a URL.
         var request = try GatewayRoutes(endpoint: endpoint).statusRequest(token: token)

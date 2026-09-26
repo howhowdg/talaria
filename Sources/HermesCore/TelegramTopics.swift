@@ -2,7 +2,7 @@ import Foundation
 import HermesProtocol
 import HermesTransport
 
-public typealias TelegramTopicsLoader = @Sendable (GatewayEndpoint, String) async throws -> JSONValue
+public typealias TelegramTopicsLoader = @Sendable (GatewayEndpoint, GatewaySession) async throws -> JSONValue
 
 /// The enclosing classification store supplies the connection/profile owner.
 /// A routing key also distinguishes per-user conversations in one group topic.

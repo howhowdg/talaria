@@ -13,8 +13,12 @@ public enum GatewayReadEndpoint: Sendable, Equatable {
 
 public struct GatewayReader: Sendable {
     private let endpoint: GatewayEndpoint
-    private let token: String
+    private let token: String?
     private let http: any GatewayHTTPTransport
+
+    public init(session: GatewaySession) {
+        endpoint = session.endpoint; token = nil; http = session
+    }
 
     public init(endpoint: GatewayEndpoint, token: String) {
         self.init(endpoint: endpoint, token: token, http: URLSessionGatewayNetwork())
@@ -55,8 +59,8 @@ public struct GatewayReader: Sendable {
 }
 
 extension GatewayRoutes {
-    func readRequest(_ resource: GatewayReadEndpoint, token: String) throws -> URLRequest {
-        guard !token.isEmpty else { throw GatewayTransportError.missingToken }
+    func readRequest(_ resource: GatewayReadEndpoint, token: String?) throws -> URLRequest {
+        if let token, token.isEmpty { throw GatewayTransportError.missingToken }
         var request = try statusRequest(token: token)
         guard let url = request.url, var route = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             throw GatewayTransportError.invalidEndpoint
@@ -83,7 +87,7 @@ extension GatewayRoutes {
         return request
     }
 
-    func automationRequest(id: String, action: String, token: String) throws -> URLRequest {
+    func automationRequest(id: String, action: String, token: String?) throws -> URLRequest {
         guard ["resume", "pause", "trigger"].contains(action) else { throw GatewayTransportError.invalidResponse }
         var request = try readRequest(.scheduleRuns(id: id, limit: 1), token: token)
         guard let url = request.url, var route = URLComponents(url: url, resolvingAgainstBaseURL: false) else {

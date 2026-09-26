@@ -150,6 +150,29 @@ final class HermesAppModelTests: XCTestCase {
         XCTAssertTrue(condition(), "Expected the ordered update stream to settle")
     }
 
+    func testSSHConnectionKeepsStableEndpointAcrossReconnect() async throws {
+        let (model, _, directory, _) = try fixture()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let configured = GatewayEndpoint(name: "Mini", baseURL: URL(string: "http://127.0.0.1:9119")!,
+            ssh: GatewaySSHDestination(host: "mini.example"))
+        var active = configured; active.baseURL = URL(string: "http://127.0.0.1:23456")!
+        await model.connect(to: active, configuredEndpoint: configured, token: "fixture")
+        XCTAssertTrue(model.isConnected)
+        XCTAssertEqual(model.endpoint, configured)
+        await model.sshTunnelExited()
+        XCTAssertFalse(model.isConnected)
+        XCTAssertTrue(model.desiredConnection)
+        XCTAssertEqual(model.endpoint, configured)
+        model.setSSHReconnectHandler {
+            var next = configured; next.baseURL = URL(string: "http://127.0.0.1:34567")!
+            return (next, "fresh-fixture")
+        }
+        await model.reconnect()
+        XCTAssertTrue(model.isConnected)
+        XCTAssertEqual(model.endpoint, configured)
+        await model.disconnect()
+    }
+
     func testTelegramDiscoveryRequiresImportAndFollowsOnlyExplicitTopicBindings() async throws {
         let topics = TelegramModelFixture()
         let (model, factory, directory, _) = try fixture(telegramLoader: { endpoint, _ in await topics.load(endpoint.profile) })
@@ -522,7 +545,7 @@ private actor ChangingRunFixture {
         let run = MobileRun(json: .object(fields), schedule: automation, profile: "default")!
         return MobileActivitySnapshot(schedules: [automation], runs: [run])
     }
-    static func transcript(_ endpoint: GatewayEndpoint, _ token: String, _ run: AutomationRun) async throws -> JSONValue {
+    static func transcript(_ endpoint: GatewayEndpoint, _ session: GatewaySession, _ run: AutomationRun) async throws -> JSONValue {
         .object(["session_id": .string(run.id), "profile": .string(endpoint.profile), "messages": .array([
             .object(["role": .string("user"), "content": .string("Do work")]),
             .object(["role": .string("assistant"), "content": .string(run.isActive ? "Partial output" : "Final output")])])])
@@ -647,7 +670,7 @@ private actor ScopedAutomationRunFixture {
     var shouldHold = false
     func hold() { shouldHold = true }
     func isHolding() -> Bool { held != nil }
-    func load(_ endpoint: GatewayEndpoint, _ token: String, _ id: String) async -> JSONValue {
+    func load(_ endpoint: GatewayEndpoint, _ session: GatewaySession, _ id: String) async -> JSONValue {
         calls.append((endpoint.profile, id))
         if shouldHold { return await withCheckedContinuation { held = $0 } }
         return response(profile: endpoint.profile, id: id)
@@ -798,5 +821,162 @@ extension HermesAppModelTests {
         XCTAssertTrue(model.mobileActivity.runs.isEmpty, "Offline cache must never leak into another owner")
         XCTAssertTrue(model.mobileActivity.schedules.isEmpty)
         await model.disconnect()
+    }
+}
+
+private actor BasicModelHTTP: GatewayHTTPTransport {
+    private(set) var requests: [URLRequest] = []
+    private var loginWaiter: CheckedContinuation<Void, Never>?
+    private var logoutWaiter: CheckedContinuation<Void, Never>?
+    var holdLogin = false
+    var holdLogout = false
+    func holdNextLogin() { holdLogin = true }
+    func holdNextLogout() { holdLogout = true }
+    func isHoldingLogin() -> Bool { loginWaiter != nil }
+    func isHoldingLogout() -> Bool { logoutWaiter != nil }
+    func releaseLogin() { loginWaiter?.resume(); loginWaiter = nil }
+    func releaseLogout() { logoutWaiter?.resume(); logoutWaiter = nil }
+    func data(for request: URLRequest) async throws -> GatewayHTTPResponse {
+        requests.append(request)
+        let path = request.url!.path
+        if path.hasSuffix("/api/status") {
+            return GatewayHTTPResponse(data: Data(#"{"auth_required":true,"auth_providers":["basic"]}"#.utf8), status: 200)
+        }
+        if path.hasSuffix("/auth/password-login") {
+            if holdLogin { await withCheckedContinuation { loginWaiter = $0 } }
+            return GatewayHTTPResponse(data: Data(#"{"ok":true}"#.utf8), status: 200,
+                headers: ["Set-Cookie": "hermes_session_at=fixture-cookie; Path=/; HttpOnly"])
+        }
+        if path.hasSuffix("/api/auth/me") {
+            let authorized = request.value(forHTTPHeaderField: "Cookie")?.contains("fixture-cookie") == true
+            return GatewayHTTPResponse(data: Data(#"{"provider":"basic","expires_at":4102444800}"#.utf8), status: authorized ? 200 : 401)
+        }
+        if path.hasSuffix("/api/auth/ws-ticket") {
+            return GatewayHTTPResponse(data: Data(#"{"ticket":"fixture-ticket","ttl_seconds":30}"#.utf8), status: 200)
+        }
+        if path.hasSuffix("/auth/logout"), holdLogout { await withCheckedContinuation { logoutWaiter = $0 } }
+        return GatewayHTTPResponse(data: Data("{}".utf8), status: path.hasSuffix("/auth/logout") ? 302 : 404)
+    }
+}
+
+extension HermesAppModelTests {
+    func testBasicSessionRoutesReadersReconnectsAndExplicitDisconnectClearsIntent() async throws {
+        let http = BasicModelHTTP()
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = HermesAppModel(defaults: defaults, draftStore: DraftStore(directory: directory),
+            clientFactory: { GatewayClient(http: http, socketFactory: { _ in AppModelSocket() }) })
+        let target = GatewayEndpoint(name: "Basic fixture", baseURL: URL(string: "http://127.0.0.1:8642")!, authentication: .basic)
+        await model.connect(to: target, username: "fixture-user", password: "fixture-password", remember: false)
+        XCTAssertTrue(model.isConnected, model.banner ?? "")
+        XCTAssertTrue(model.desiredConnection)
+        XCTAssertFalse(model.remembersSignIn)
+        await model.reconnect()
+        XCTAssertTrue(model.isConnected, model.banner ?? "")
+        let requests = await http.requests
+        XCTAssertEqual(requests.filter { $0.url!.path.hasSuffix("/auth/password-login") }.count, 1)
+        XCTAssertEqual(requests.filter { $0.url!.path.hasSuffix("/api/auth/ws-ticket") }.count, 2)
+        let reads = requests.filter { $0.url!.path.contains("telegram") }
+        XCTAssertFalse(reads.isEmpty)
+        XCTAssertTrue(reads.allSatisfy { $0.value(forHTTPHeaderField: "Cookie")?.contains("fixture-cookie") == true })
+        XCTAssertTrue(requests.allSatisfy { $0.value(forHTTPHeaderField: "X-Hermes-Session-Token") == nil })
+        await model.signOut()
+        XCTAssertFalse(model.isConnected)
+        XCTAssertFalse(model.desiredConnection)
+        XCTAssertFalse(model.remembersSignIn)
+        let logout = await http.requests.last { $0.url!.path.hasSuffix("/auth/logout") }
+        XCTAssertEqual(logout?.value(forHTTPHeaderField: "Cookie"), "hermes_session_at=fixture-cookie")
+        let restarted = HermesAppModel(defaults: defaults)
+        XCTAssertFalse(restarted.remembersSignIn)
+    }
+
+    func testCancelBasicLoginCannotConnectAfterResponseArrives() async throws {
+        let http = BasicModelHTTP(); await http.holdNextLogin()
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
+        let model = HermesAppModel(defaults: defaults,
+            clientFactory: { GatewayClient(http: http, socketFactory: { _ in AppModelSocket() }) })
+        let target = GatewayEndpoint(name: "Basic fixture", baseURL: URL(string: "http://127.0.0.1:8642")!, authentication: .basic)
+        let login = Task { await model.connect(to: target, username: "user", password: "password", remember: false) }
+        for _ in 0..<100 {
+            if await http.isHoldingLogin() { break }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        let holding = await http.isHoldingLogin(); XCTAssertTrue(holding)
+        await model.disconnect()
+        await http.releaseLogin()
+        await login.value
+        XCTAssertFalse(model.isConnected)
+        XCTAssertFalse(model.isConnecting)
+        XCTAssertFalse(model.desiredConnection)
+        let ticketRequested = await http.requests.contains { $0.url!.path.hasSuffix("/api/auth/ws-ticket") }
+        XCTAssertFalse(ticketRequested)
+    }
+
+    func testSignOutDisablesConnectionBeforeLogoutCompletes() async throws {
+        let http = BasicModelHTTP()
+        let model = HermesAppModel(defaults: try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString)),
+            clientFactory: { GatewayClient(http: http, socketFactory: { _ in AppModelSocket() }) })
+        let target = GatewayEndpoint(name: "Basic fixture", baseURL: URL(string: "http://127.0.0.1:8642")!, authentication: .basic)
+        await model.connect(to: target, username: "user", password: "password", remember: false)
+        XCTAssertTrue(model.isConnected)
+        await http.holdNextLogout()
+        let signOut = Task { await model.signOut() }
+        for _ in 0..<100 {
+            if await http.isHoldingLogout() { break }
+            await Task.yield()
+        }
+        let holding = await http.isHoldingLogout()
+        XCTAssertTrue(holding)
+        XCTAssertFalse(model.isConnected)
+        XCTAssertFalse(model.canSend)
+        let next = GatewayEndpoint(name: "Next fixture", baseURL: URL(string: "http://127.0.0.1:8643")!, authentication: .basic)
+        await model.connect(to: next, username: "user", password: "password", remember: false)
+        XCTAssertTrue(model.isConnected)
+        await http.releaseLogout()
+        await signOut.value
+        XCTAssertTrue(model.isConnected)
+        XCTAssertEqual(model.endpoint, next)
+        await model.disconnect()
+    }
+}
+
+extension HermesAppModelTests {
+    func testRememberedBasicRestoreOptOutAndLegacyTokenBinding() async throws {
+        let http = BasicModelHTTP()
+        let store = CredentialStore(service: "talaria-auth-tests." + UUID().uuidString)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
+        let target = GatewayEndpoint(name: "Basic fixture", baseURL: URL(string: "http://127.0.0.1:8642")!, authentication: .basic)
+        defer { try? store.deleteSession(for: target); try? store.deleteToken(for: target) }
+        func model() -> HermesAppModel {
+            HermesAppModel(defaults: defaults, credentials: store,
+                clientFactory: { GatewayClient(http: http, socketFactory: { _ in AppModelSocket() }) })
+        }
+        let first = model()
+        await first.connect(to: target, username: "user", password: "password", remember: true)
+        XCTAssertTrue(first.isConnected, first.banner ?? "")
+        XCTAssertNotNil(try store.readSession(for: target))
+        await first.disconnect()
+        XCTAssertNotNil(try store.readSession(for: target))
+        let restored = model()
+        XCTAssertTrue(restored.remembersSignIn)
+        await restored.connect(to: target, username: "", password: "", remember: false)
+        XCTAssertTrue(restored.isConnected, restored.banner ?? "")
+        XCTAssertNil(try store.readSession(for: target))
+        await restored.disconnect()
+        XCTAssertFalse(model().remembersSignIn)
+        var legacy = target; legacy.authentication = .sessionToken
+        try store.save("legacy-fixture", account: legacy.id.uuidString)
+        XCTAssertEqual(try store.readToken(for: legacy, legacyEndpoint: legacy), "legacy-fixture")
+        var changed = legacy; changed.baseURL = URL(string: "http://127.0.0.1:8643")!
+        XCTAssertNil(try store.readToken(for: changed, legacyEndpoint: legacy))
+        await restored.connect(to: target, username: "user", password: "password", remember: true)
+        XCTAssertNotNil(try store.readSession(for: target))
+        await restored.signOut()
+        XCTAssertNil(try store.readSession(for: target))
+        try store.saveToken("bound-fixture", for: legacy)
+        XCTAssertNil(try store.read(account: legacy.id.uuidString))
+        XCTAssertEqual(try store.readToken(for: legacy, legacyEndpoint: legacy), "bound-fixture")
+        XCTAssertNil(try store.readToken(for: changed, legacyEndpoint: legacy))
     }
 }

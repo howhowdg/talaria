@@ -15,8 +15,132 @@ final class MacCoordinator {
     static let shared = MacCoordinator()
     let model = HermesAppModel()
     let runtime = LocalRuntimeManager()
+    let tunnel = SSHTunnelManager()
+    let remote = RemoteHermesManager()
+    private var sshDestination: GatewaySSHDestination?
+    private var sshRevision = UUID()
+
+    init() {
+        model.setSSHReconnectHandler { [weak self] in
+            guard let self, let configured = self.model.endpoint, configured.ssh != nil else {
+                throw GatewayTransportError.invalidEndpoint
+            }
+            let active = try await self.resolveSSH(configured)
+            guard configured.authentication == .sessionToken else { return (active, nil) }
+            do { return (active, try await GatewayTokenBootstrap.token(through: active)) }
+            catch GatewayTransportError.missingToken { return (active, nil) }
+        }
+    }
+
+    private func resolveSSH(_ configured: GatewayEndpoint) async throws -> GatewayEndpoint {
+        guard let ssh = configured.ssh else { throw GatewayTransportError.invalidEndpoint }
+        let url: URL
+        if sshDestination == ssh, let running = await tunnel.runningURL() {
+            url = running
+        } else {
+            sshRevision = UUID()
+            await tunnel.stop()
+            await remote.stop()
+            sshDestination = nil
+            let identity = ssh.identityFile.map { URL(fileURLWithPath: NSString(string: $0).expandingTildeInPath) }
+            var config = SSHConfiguration(host: ssh.host, user: ssh.user, sshPort: ssh.sshPort,
+                identityFile: identity, gatewayPort: ssh.gatewayPort, gatewayPath: ssh.gatewayPath)
+            if !ssh.attachesExistingGateway {
+                config.gatewayPort = try await remote.start(config, profile: configured.profile)
+                config.gatewayPath = "/"
+            }
+            do { url = try await tunnel.start(config).baseURL }
+            catch { await remote.stop(); throw error }
+            sshDestination = ssh
+            let stamp = sshRevision
+            Task { [weak self] in
+                guard let self else { return }
+                await self.tunnel.waitForExit()
+                if self.sshRevision == stamp {
+                    await self.model.sshTunnelExited()
+                    if self.sshRevision == stamp { await self.remote.stop() }
+                }
+            }
+        }
+        var active = configured
+        active.baseURL = url
+        return active
+    }
+
+    func connectSSH(_ configured: GatewayEndpoint, username: String?, password: String?,
+                    token suppliedToken: String?, remember: Bool) async -> GatewayAuthentication? {
+        await model.disconnect()
+        await runtime.stop()
+        sshRevision = UUID()
+        await tunnel.stop()
+        await remote.stop()
+        sshDestination = nil
+        do {
+            var active = try await resolveSSH(configured)
+            try Task.checkCancellation()
+            var selected = configured
+            let gatewayToken: String?
+            do { gatewayToken = try await GatewayTokenBootstrap.token(through: active) }
+            catch GatewayTransportError.interactiveAuthenticationRequired {
+                guard selected.ssh?.attachesExistingGateway == true else {
+                    throw GatewayTransportError.interactiveAuthenticationRequired
+                }
+                selected.authentication = .basic
+                active.authentication = .basic
+                if password == nil && !(model.savedEndpoint?.id == selected.id
+                    && model.savedEndpoint?.authentication == .basic && model.remembersSignIn) {
+                    model.banner = "Enter the gateway username and password."
+                    await endSSH(signOut: false)
+                    return .basic
+                }
+                try Task.checkCancellation()
+                await model.connect(to: active, configuredEndpoint: selected,
+                                    username: username ?? "", password: password ?? "", remember: remember)
+                if model.isConnected { return nil }
+                await endSSH(signOut: false)
+                return .basic
+            }
+            catch GatewayTransportError.missingToken {
+                guard selected.ssh?.attachesExistingGateway == true else { throw GatewayTransportError.missingToken }
+                gatewayToken = nil
+            }
+            try Task.checkCancellation()
+            await model.connect(to: active, configuredEndpoint: selected,
+                                token: gatewayToken ?? suppliedToken, remember: remember)
+            if !model.isConnected {
+                await model.disconnect()
+                sshRevision = UUID()
+                await tunnel.stop()
+                await remote.stop()
+                sshDestination = nil
+                return .sessionToken
+            }
+            return nil
+        } catch {
+            sshRevision = UUID()
+            await tunnel.stop()
+            await remote.stop()
+            sshDestination = nil
+            if !(error is CancellationError) { model.banner = error.localizedDescription }
+            return nil
+        }
+    }
+
+    func endSSH(signOut: Bool) async {
+        if signOut { await model.signOut() }
+        else { await model.disconnect() }
+        sshRevision = UUID()
+        await tunnel.stop()
+        await remote.stop()
+        sshDestination = nil
+    }
 
     func startLocal() async {
+        await model.disconnect()
+        sshRevision = UUID()
+        await tunnel.stop()
+        await remote.stop()
+        sshDestination = nil
         guard let candidate = RuntimeDiscovery.candidates().first else {
             model.banner = "Hermes is not installed. Install the Hermes CLI, or connect to a gateway running on another machine."
             return
@@ -32,7 +156,7 @@ final class MacCoordinator {
         } catch { model.banner = error.localizedDescription }
     }
 
-    func stop() async { await model.disconnect(); await runtime.stop() }
+    func stop() async { await model.disconnect(); sshRevision = UUID(); await tunnel.stop(); await remote.stop(); await runtime.stop() }
 
     #if DEBUG
     /// A manually invoked preview connects only to an expiring, loopback fixture.
@@ -89,7 +213,10 @@ struct HermesMacApp: App {
     private let coordinator = MacCoordinator.shared
     var body: some Scene {
         Window("Talaria", id: "main") {
-            HermesRootView(model: coordinator.model, startLocal: { await coordinator.startLocal() })
+            HermesRootView(model: coordinator.model, startLocal: { await coordinator.startLocal() },
+                connectSSH: { await coordinator.connectSSH($0, username: $1, password: $2, token: $3, remember: $4) },
+                reconnectSSH: { await coordinator.model.reconnect() },
+                endSSH: { await coordinator.endSSH(signOut: $0) })
                 .dynamicTypeSize(.medium)
                 .frame(minWidth: 1000, minHeight: 600)
         }

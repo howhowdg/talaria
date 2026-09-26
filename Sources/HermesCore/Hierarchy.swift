@@ -235,7 +235,7 @@ public enum WorkspaceFileReferences {
     }
 }
 
-public typealias AutomationRunDetailLoader = @Sendable (GatewayEndpoint, String, AutomationRun) async throws -> JSONValue
+public typealias AutomationRunDetailLoader = @Sendable (GatewayEndpoint, GatewaySession, AutomationRun) async throws -> JSONValue
 
 /// Ephemeral confirmation of a response written to the gateway. Never stores a
 /// question, command, answer text, or secret. The owning composer scope is kept
@@ -256,4 +256,4 @@ public struct RequestReceipt: Identifiable, Equatable, Sendable {
         } else { summary = "You responded" }
     }
 }
-public typealias AutomationRunsLoader = @Sendable (GatewayEndpoint, String, String) async throws -> JSONValue
+public typealias AutomationRunsLoader = @Sendable (GatewayEndpoint, GatewaySession, String) async throws -> JSONValue

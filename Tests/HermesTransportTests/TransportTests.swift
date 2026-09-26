@@ -117,6 +117,22 @@ private actor DelayedStatusHTTP: GatewayHTTPTransport {
 
 @MainActor
 final class TransportTests: XCTestCase {
+    func testSSHAddressAcceptsPastedTargetAndRejectsMalformedInput() {
+        XCTAssertEqual(GatewaySSHDestination.parse("user@mini.tailnet:2222"),
+                       GatewaySSHDestination(host: "mini.tailnet", user: "user", sshPort: 2222))
+        XCTAssertEqual(GatewaySSHDestination.parse("ssh user@mini"),
+                       GatewaySSHDestination(host: "mini", user: "user"))
+        XCTAssertNil(GatewaySSHDestination.parse("user@@mini"))
+        XCTAssertNil(GatewaySSHDestination.parse("user@mini:0"))
+        XCTAssertNil(GatewaySSHDestination.parse("-oProxyCommand=evil"))
+        let legacy = GatewaySSHDestination(host: "mini", gatewayPort: 9443, gatewayPath: "/hermes")
+        XCTAssertTrue(legacy.attachesExistingGateway)
+        XCTAssertFalse(GatewaySSHDestination(host: "mini").attachesExistingGateway)
+        var managed = legacy
+        managed.useExistingGateway = false
+        XCTAssertFalse(managed.attachesExistingGateway)
+    }
+
     private func endpoint(_ url: String = "http://127.0.0.1:8642", profile: String = "default") -> GatewayEndpoint {
         GatewayEndpoint(name: "Fixture", baseURL: URL(string: url)!, profile: profile)
     }
@@ -141,12 +157,13 @@ final class TransportTests: XCTestCase {
     }
 
     func testUnsafeEndpointURLsAreRejected() throws {
-        for url in ["http://host.example", "https://user:password@host.example", "https://host.example?token=secret", "https://host.example/#fragment", "file:///tmp/hermes", "http://127.0.0.1.evil.example"] {
+        for url in ["http://host.example", "http://100.63.255.255", "http://100.128.0.1", "http://100.bad.64.1.2", "http://0100.64.0.1", "https://user:password@host.example", "https://host.example?token=secret", "https://host.example/#fragment", "file:///tmp/hermes", "http://127.0.0.1.evil.example"] {
             XCTAssertThrowsError(try GatewayRoutes(endpoint: endpoint(url)), url)
         }
-        for url in ["http://127.0.0.1:9000", "http://localhost:9000", "http://[::1]:9000", "https://host.example"] {
+        for url in ["http://127.0.0.1:9000", "http://localhost:9000", "http://[::1]:9000", "http://100.64.0.1:8642", "http://100.127.255.254:8642", "https://host.example"] {
             XCTAssertNoThrow(try GatewayRoutes(endpoint: endpoint(url)), url)
         }
+        XCTAssertEqual(try GatewayRoutes(endpoint: endpoint("http://100.64.1.2:8642")).socketRequest(token: "test").url?.scheme, "ws")
     }
 
     func testConnectDeclaresCapabilitiesAndRoundTripsRawJSONValues() async throws {

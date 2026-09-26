@@ -28,6 +28,7 @@ from fixtures.mock_openai import DOCUMENT_MARKER, MockOpenAI, image_fixture
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+BASIC_AUTH_REVISION = "9fc7f17906eab1dd81ddfdf8a1edeecac1e79940"
 UI_HANDOFF = Path("/tmp/hermes-native-ui-fixture.json")
 
 
@@ -39,6 +40,8 @@ def parser():
                         help="Existing Python with Hermes dependencies; never modified")
     result.add_argument("--smoke", type=Path, default=WORKSPACE / ".build/debug/hermes-smoke")
     result.add_argument("--timeout", type=float, default=120, help="Seconds for each startup/client phase")
+    result.add_argument("--auth", choices=("token", "basic"), default="token",
+                        help="Basic requires the separately reviewed auth revision; see BASIC_AUTH_REVISION")
     result.add_argument("--backend-only", action="store_true", help="Check authenticated HTTP startup only")
     result.add_argument("--native-runtime", action="store_true",
                         help="Have Swift LocalRuntimeManager launch and stop the real isolated backend")
@@ -81,6 +84,8 @@ def prepare_home(root, provider_url, *, extended=False):
         "terminal:\n  env: local\n"
         "auxiliary:\n  title_generation:\n    model_upgrade_enabled: false\n"
         "mcp_servers: {}\n")
+    # Expose the safe todo tool directly, independent of upstream discovery defaults.
+    config += 'tools:\n  tool_search:\n    enabled: "off"\n'
     if extended:
         # Exercise native vision through the supported configuration surface.
         config += "agent:\n  image_input_mode: native\n"
@@ -192,6 +197,8 @@ def main():
         raise RuntimeError("--hold-for-ui requires a passing full native smoke run")
     if args.native_runtime and (args.hold_for_ui or args.backend_only):
         raise RuntimeError("--native-runtime cannot be combined with --hold-for-ui or --backend-only")
+    if args.auth == "basic" and (args.native_runtime or args.hold_for_ui):
+        raise RuntimeError("Basic smoke uses a remote connection; --native-runtime and --hold-for-ui are token-only")
     repo = args.repo.resolve()
     if not (repo / "hermes_cli/main.py").is_file():
         raise RuntimeError("--repo must be the pinned Hermes source checkout")
@@ -205,8 +212,9 @@ def main():
         raise RuntimeError("Build the hermes-smoke Swift executable before running this integration test")
     pin = json.loads((WORKSPACE / "Contracts/pin.json").read_text(encoding="utf-8"))
     revision = subprocess.check_output(["/usr/bin/git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
-    if revision != pin["commit"]:
-        raise RuntimeError("Backend checkout revision differs from Contracts/pin.json")
+    expected_revision = BASIC_AUTH_REVISION if args.auth == "basic" else pin["commit"]
+    if revision != expected_revision:
+        raise RuntimeError("Backend checkout revision differs from the selected auth compatibility pin")
     token = secrets.token_hex(32)
     log = deque(maxlen=120)
     lines = queue.Queue()
@@ -220,6 +228,15 @@ def main():
         if not args.backend_only:
             shutil.copy2(args.smoke.resolve(), client)
         env = isolated_environment(root, repo, provider.url, token)
+        if args.auth == "basic":
+            # Engage the real public auth gate while keeping every listener on loopback.
+            # Desktop-owned runtimes intentionally bypass that gate, so remove ownership markers.
+            for name in ("HERMES_DESKTOP", "HERMES_PARENT_PID", "HERMES_DASHBOARD_SESSION_TOKEN"):
+                env.pop(name, None)
+            env.update(HERMES_DASHBOARD_PUBLIC_URL="https://native-smoke.invalid",
+                       HERMES_DASHBOARD_BASIC_AUTH_USERNAME="native-smoke",
+                       HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=token,
+                       HERMES_DASHBOARD_BASIC_AUTH_SECRET=secrets.token_hex(32))
         extra_flags = ["--extended", "--fixture-directory", str(root / "client-inputs")] if args.extended else []
         workspace = root / "workspace"
         env["TERMINAL_CWD"] = str(workspace)
@@ -270,17 +287,23 @@ def main():
                     break
             if base is None:
                 raise RuntimeError("Real backend did not announce ready before timeout")
-            request = urllib.request.Request(base + "/api/status", headers={"Authorization": "Bearer " + token})
+            headers = {} if args.auth == "basic" else {"Authorization": "Bearer " + token}
+            request = urllib.request.Request(base + "/api/status", headers=headers)
             with urllib.request.urlopen(request, timeout=15) as response:
                 status = json.load(response)
-            if status.get("auth_required"):
-                raise RuntimeError("Isolated gateway did not accept its generated authentication token")
-            print(f"PASS: real backend {revision[:12]} started and accepted authenticated HTTP", flush=True)
+            if bool(status.get("auth_required")) != (args.auth == "basic"):
+                raise RuntimeError("Isolated gateway did not activate the selected authentication mode")
+            print(f"PASS: real backend {revision[:12]} started with expected {args.auth} authentication mode", flush=True)
             if args.backend_only:
                 print("BACKEND ONLY: Swift transport, chat, tools and reconnect were not exercised", flush=True)
                 return 0
             client_env = dict(env)
-            client_env["HERMES_GATEWAY_TOKEN"] = token
+            if args.auth == "basic":
+                client_env["HERMES_GATEWAY_USERNAME"] = "native-smoke"
+                client_env["HERMES_GATEWAY_PASSWORD"] = token
+                extra_flags += ["--basic"]
+            else:
+                client_env["HERMES_GATEWAY_TOKEN"] = token
             smoke = subprocess.run([str(client), "--url", base, "--profile", "default", *extra_flags],
                                    cwd=workspace, env=client_env, stdin=subprocess.DEVNULL,
                                    capture_output=True, text=True, encoding="utf-8", timeout=args.timeout)
